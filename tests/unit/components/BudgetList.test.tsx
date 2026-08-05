@@ -68,6 +68,24 @@ describe("BudgetList", () => {
     expect(screen.queryByText("10000")).not.toBeInTheDocument();
   });
 
+  it('shows "On track" status text when comfortably under the limit', () => {
+    render(<BudgetList budgets={[makeBudget({ percentUsed: 67, isOverBudget: false })]} currency="USD" />);
+    expect(screen.getByText("On track")).toBeInTheDocument();
+  });
+
+  it('shows "Near limit" status text at 80% or above but not yet over', () => {
+    const nearLimit = makeBudget({
+      amountCents: 10000,
+      spentCents: 8500,
+      remainingCents: 1500,
+      percentUsed: 85,
+      isOverBudget: false,
+    });
+    render(<BudgetList budgets={[nearLimit]} currency="USD" />);
+    expect(screen.getByText("Near limit")).toBeInTheDocument();
+    expect(screen.getByText(/remaining/)).toBeInTheDocument();
+  });
+
   it('shows "over budget" wording (not "remaining") when spending exceeds the limit', () => {
     const overBudget = makeBudget({
       amountCents: 10000,

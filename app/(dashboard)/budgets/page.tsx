@@ -2,6 +2,7 @@ import { listBudgetsWithProgress } from "@/server/data/budgets";
 import { listCategories } from "@/server/data/categories";
 import { getCurrentUserCurrency } from "@/server/data/users";
 import { currentMonthKey } from "@/lib/dates";
+import { filterAvailableBudgetCategories } from "@/lib/budgets";
 import { MonthSelector } from "@/components/budgets/MonthSelector";
 import { BudgetList } from "@/components/budgets/BudgetList";
 import { BudgetFormDialog } from "@/components/budgets/BudgetFormDialog";
@@ -36,9 +37,7 @@ export default async function BudgetsPage({
   // dropdown -- proactive UX; the database's unique constraint is the real
   // enforcement (see server/data/budgets.ts's createBudget).
   const budgetedCategoryIds = new Set(budgets.map((b) => b.categoryId));
-  const availableCategories = categories.filter(
-    (c) => c.type === "EXPENSE" && !budgetedCategoryIds.has(c.id),
-  );
+  const availableCategories = filterAvailableBudgetCategories(categories, budgetedCategoryIds);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
