@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createTransactionAction, updateTransactionAction } from "@/server/actions/transactions";
 import { Button } from "@/components/ui/Button";
 import type { TransactionDTO } from "@/server/data/transactions";
@@ -16,15 +16,28 @@ interface TransactionFormProps {
 
 type FormState = ActionResult<TransactionDTO> | null;
 
+// Every field is controlled by local state (value + onChange) rather than
+// defaultValue. React's own handling of a native <form action={fn}> submit
+// resets uncontrolled fields once the action settles, regardless of
+// success or failure -- confirmed empirically, not just documentation --
+// which would otherwise wipe a rejected submission's input right when the
+// user most needs to see and fix it. Controlled inputs are immune to that
+// reset because their displayed value always comes from React state, never
+// from the DOM.
 export function TransactionForm({ mode, transaction, categories, onSuccess }: TransactionFormProps) {
-  const [type, setType] = useState<"EXPENSE" | "INCOME">(transaction?.type ?? "EXPENSE");
-
   const boundAction =
     mode === "edit" && transaction
       ? updateTransactionAction.bind(null, transaction.id)
       : createTransactionAction;
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, null);
+
+  const [type, setType] = useState<"EXPENSE" | "INCOME">(transaction?.type ?? "EXPENSE");
+  const [amount, setAmount] = useState(transaction ? (transaction.amountCents / 100).toFixed(2) : "");
+  const [date, setDate] = useState(transaction?.date ?? new Date().toISOString().slice(0, 10));
+  const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? "");
+  const [description, setDescription] = useState(transaction?.description ?? "");
+  const [notes, setNotes] = useState(transaction?.notes ?? "");
 
   // useActionState re-renders with the new state in the same round trip as
   // the submit, so this fires right after a successful create/update.
@@ -34,7 +47,31 @@ export function TransactionForm({ mode, transaction, categories, onSuccess }: Tr
     }
   }, [state, onSuccess]);
 
-  const initialAmount = transaction ? (transaction.amountCents / 100).toFixed(2) : "";
+  // Belt-and-suspenders fix, verified empirically: after a native
+  // <form action={fn}> submit settles (success or failure), something in
+  // the browser/React's own form-action handling resets a <select>'s
+  // selected option back to blank even though it's fully controlled --
+  // text/textarea inputs correctly resist this, <select> does not. Forcing
+  // the DOM property back to match state after every render, before paint,
+  // keeps the category visibly correct regardless of what caused the
+  // mismatch.
+  const categorySelectRef = useRef<HTMLSelectElement>(null);
+  useLayoutEffect(() => {
+    if (categorySelectRef.current && categorySelectRef.current.value !== categoryId) {
+      categorySelectRef.current.value = categoryId;
+    }
+  });
+
+  // Several TransactionForm instances (one per row's edit dialog, plus the
+  // header's add dialog) are always mounted at once -- TransactionList
+  // renders both the desktop table and mobile card list simultaneously,
+  // each row wrapping its own edit dialog. A hardcoded id like "amount"
+  // would duplicate across every instance, which breaks the label/
+  // aria-describedby association for whichever instance isn't first in the
+  // DOM. useId() gives each mounted form its own unique, stable prefix.
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
+
   const filteredCategories = categories.filter((c) => c.type === type);
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const generalError = state && !state.ok ? state.error : undefined;
@@ -66,60 +103,64 @@ export function TransactionForm({ mode, transaction, categories, onSuccess }: Tr
       </fieldset>
 
       <div>
-        <label htmlFor="amount" className="mb-1 block text-sm font-medium">
+        <label htmlFor={fieldId("amount")} className="mb-1 block text-sm font-medium">
           Amount
         </label>
         <input
-          id="amount"
+          id={fieldId("amount")}
           name="amount"
           type="text"
           inputMode="decimal"
-          defaultValue={initialAmount}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
           placeholder="0.00"
           required
           aria-invalid={fieldErrors?.amount ? true : undefined}
-          aria-describedby={fieldErrors?.amount ? "amount-error" : undefined}
+          aria-describedby={fieldErrors?.amount ? fieldId("amount-error") : undefined}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.amount && (
-          <p id="amount-error" role="alert" className="mt-1 text-sm text-danger">
+          <p id={fieldId("amount-error")} role="alert" className="mt-1 text-sm text-danger">
             {fieldErrors.amount[0]}
           </p>
         )}
       </div>
 
       <div>
-        <label htmlFor="date" className="mb-1 block text-sm font-medium">
+        <label htmlFor={fieldId("date")} className="mb-1 block text-sm font-medium">
           Date
         </label>
         <input
-          id="date"
+          id={fieldId("date")}
           name="date"
           type="date"
-          defaultValue={transaction?.date ?? new Date().toISOString().slice(0, 10)}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
           required
           aria-invalid={fieldErrors?.date ? true : undefined}
-          aria-describedby={fieldErrors?.date ? "date-error" : undefined}
+          aria-describedby={fieldErrors?.date ? fieldId("date-error") : undefined}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.date && (
-          <p id="date-error" role="alert" className="mt-1 text-sm text-danger">
+          <p id={fieldId("date-error")} role="alert" className="mt-1 text-sm text-danger">
             {fieldErrors.date[0]}
           </p>
         )}
       </div>
 
       <div>
-        <label htmlFor="categoryId" className="mb-1 block text-sm font-medium">
+        <label htmlFor={fieldId("categoryId")} className="mb-1 block text-sm font-medium">
           Category
         </label>
         <select
-          id="categoryId"
+          ref={categorySelectRef}
+          id={fieldId("categoryId")}
           name="categoryId"
-          defaultValue={transaction?.categoryId ?? ""}
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
           required
           aria-invalid={fieldErrors?.categoryId ? true : undefined}
-          aria-describedby={fieldErrors?.categoryId ? "category-error" : undefined}
+          aria-describedby={fieldErrors?.categoryId ? fieldId("category-error") : undefined}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         >
           <option value="" disabled>
@@ -135,42 +176,44 @@ export function TransactionForm({ mode, transaction, categories, onSuccess }: Tr
           <p className="mt-1 text-sm text-muted">No {type.toLowerCase()} categories yet.</p>
         )}
         {fieldErrors?.categoryId && (
-          <p id="category-error" role="alert" className="mt-1 text-sm text-danger">
+          <p id={fieldId("category-error")} role="alert" className="mt-1 text-sm text-danger">
             {fieldErrors.categoryId[0]}
           </p>
         )}
       </div>
 
       <div>
-        <label htmlFor="description" className="mb-1 block text-sm font-medium">
+        <label htmlFor={fieldId("description")} className="mb-1 block text-sm font-medium">
           Description
         </label>
         <input
-          id="description"
+          id={fieldId("description")}
           name="description"
           type="text"
-          defaultValue={transaction?.description ?? ""}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           maxLength={200}
           required
           aria-invalid={fieldErrors?.description ? true : undefined}
-          aria-describedby={fieldErrors?.description ? "description-error" : undefined}
+          aria-describedby={fieldErrors?.description ? fieldId("description-error") : undefined}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.description && (
-          <p id="description-error" role="alert" className="mt-1 text-sm text-danger">
+          <p id={fieldId("description-error")} role="alert" className="mt-1 text-sm text-danger">
             {fieldErrors.description[0]}
           </p>
         )}
       </div>
 
       <div>
-        <label htmlFor="notes" className="mb-1 block text-sm font-medium">
+        <label htmlFor={fieldId("notes")} className="mb-1 block text-sm font-medium">
           Notes <span className="font-normal text-muted">(optional)</span>
         </label>
         <textarea
-          id="notes"
+          id={fieldId("notes")}
           name="notes"
-          defaultValue={transaction?.notes ?? ""}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
           rows={2}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"

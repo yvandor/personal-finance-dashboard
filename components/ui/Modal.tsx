@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   open: boolean;
@@ -15,6 +15,12 @@ interface ModalProps {
 // clicking the close button.
 export function Modal({ open, onClose, title, children }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Several dialogs (one per row's edit/delete, plus the header's add) are
+  // always mounted at once -- see TransactionList's comment on rendering
+  // both the desktop table and mobile card list simultaneously. A hardcoded
+  // id would duplicate across every instance, breaking aria-labelledby for
+  // whichever isn't first in the DOM. useId() is unique per instance.
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -34,11 +40,11 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
       className="w-full max-w-lg rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/50"
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 id="modal-title" className="text-base font-semibold">
+        <h2 id={titleId} className="text-base font-semibold">
           {title}
         </h2>
         <button
