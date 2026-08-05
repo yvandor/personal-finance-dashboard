@@ -46,6 +46,15 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # Next.js generates ambient types (e.g. LayoutProps) into .next/types/
+      # the first time it builds or runs -- normally invisible locally
+      # because a dev/build cycle has usually already happened at least
+      # once. On a from-scratch CI checkout, `tsc --noEmit` alone would fail
+      # with "Cannot find name 'LayoutProps'" without generating them first.
+      # `next typegen` does only that, without a full build.
+      - name: Generate Next.js types
+        run: npx next typegen
+
       - name: Type check
         run: npx tsc --noEmit
 
