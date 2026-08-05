@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
+    "db:seed": "prisma db seed",
     "test": "vitest run"
   },
   "dependencies": {
@@ -30,11 +31,13 @@
     "eslint-config-next": "16.3.0",
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.6",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
   "allowScripts": {
     "prisma@7.9.1": true,
-    "@prisma/engines@7.9.1": true
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.28.1": true
   }
 }

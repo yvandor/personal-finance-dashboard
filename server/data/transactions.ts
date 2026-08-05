@@ -6,7 +6,6 @@ import {
   transactionCreateSchema,
   transactionUpdateSchema,
   transactionFilterSchema,
-  type TransactionFilterInput,
 } from "@/lib/schemas/transaction";
 import type { TransactionType } from "@/app/generated/prisma/enums";
 import type { Prisma, Transaction } from "@/app/generated/prisma/client";
@@ -83,18 +82,11 @@ async function assertUsableCategory(
   }
 }
 
-export interface ListTransactionsResult {
-  items: TransactionDTO[];
-  total: number;
-}
-
-export async function listTransactions(
-  rawFilters: TransactionFilterInput = {},
-): Promise<ListTransactionsResult> {
-  const userId = await requireUserId();
-  const filters = transactionFilterSchema.parse(rawFilters);
-
-  const where: Prisma.TransactionWhereInput = {
+function buildWhere(
+  userId: string,
+  filters: ReturnType<typeof transactionFilterSchema.parse>,
+): Prisma.TransactionWhereInput {
+  return {
     userId,
     ...(filters.type ? { type: filters.type } : {}),
     ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
@@ -115,6 +107,17 @@ export async function listTransactions(
         }
       : {}),
   };
+}
+
+export interface ListTransactionsResult {
+  items: TransactionDTO[];
+  total: number;
+}
+
+export async function listTransactions(rawFilters: unknown = {}): Promise<ListTransactionsResult> {
+  const userId = await requireUserId();
+  const filters = transactionFilterSchema.parse(rawFilters);
+  const where = buildWhere(userId, filters);
 
   const [items, total] = await Promise.all([
     prisma.transaction.findMany({
@@ -127,6 +130,42 @@ export async function listTransactions(
   ]);
 
   return { items: items.map(toDTO), total };
+}
+
+export interface TransactionsSummary {
+  incomeCents: number;
+  expenseCents: number;
+  netCents: number;
+  count: number;
+}
+
+// Summary for whatever the current filters/list show (e.g. the transaction
+// page's summary cards) -- not a monthly dashboard aggregate. It reuses the
+// exact same `where` as listTransactions so the numbers always describe the
+// same rows the table below them is showing.
+export async function getTransactionsSummary(rawFilters: unknown = {}): Promise<TransactionsSummary> {
+  const userId = await requireUserId();
+  const filters = transactionFilterSchema.parse(rawFilters);
+  const where = buildWhere(userId, filters);
+
+  const grouped = await prisma.transaction.groupBy({
+    by: ["type"],
+    where,
+    _sum: { amountCents: true },
+    _count: true,
+  });
+
+  const income = grouped.find((g) => g.type === "INCOME");
+  const expense = grouped.find((g) => g.type === "EXPENSE");
+  const incomeCents = income?._sum.amountCents ?? 0;
+  const expenseCents = expense?._sum.amountCents ?? 0;
+
+  return {
+    incomeCents,
+    expenseCents,
+    netCents: incomeCents - expenseCents,
+    count: (income?._count ?? 0) + (expense?._count ?? 0),
+  };
 }
 
 export async function getTransaction(id: string): Promise<TransactionDTO | null> {

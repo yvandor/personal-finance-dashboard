@@ -27,5 +27,12 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     hookTimeout: 20_000,
     testTimeout: 20_000,
+    // Integration test files share one real Postgres database and reset a
+    // fixed set of test-user rows in beforeEach. Running multiple files
+    // concurrently lets one file's reset wipe data another file's test is
+    // mid-assertion on. The suite is small and fast, so serializing file
+    // execution is cheap -- simpler than giving every file distinct user
+    // ids or moving to per-test transactional rollback.
+    fileParallelism: false,
   },
 });
