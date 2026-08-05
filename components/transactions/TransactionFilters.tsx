@@ -10,6 +10,10 @@ interface TransactionFiltersProps {
 
 const FILTER_KEYS = ["type", "categoryId", "dateFrom", "dateTo", "q"] as const;
 
+// Hardcoded ids ("q", "type", ...) are safe here because this component
+// renders exactly once per page -- unlike TransactionForm, which needs
+// useId() since multiple instances (one per row's edit dialog, across both
+// the desktop table and mobile card list) can be mounted simultaneously.
 export function TransactionFilters({ categories }: TransactionFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
