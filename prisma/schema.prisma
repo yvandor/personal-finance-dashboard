@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// Domain models
+//
+// Authentication is not implemented in this phase. The `User` model exists
+// now only as the ownership anchor every other table hangs a `userId` off
+// of, which is what lets a later Auth.js integration thread a real session
+// user through unchanged queries instead of retrofitting isolation onto
+// data that assumed a single user. Auth.js's own adapter tables (Account,
+// Session, VerificationToken) and the extra User fields it expects
+// (name, emailVerified, image) are deliberately NOT added yet — they are
+// pure auth infrastructure with no use until auth is actually wired up, and
+// adding them later is an additive, low-risk migration.
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  currency  String   @default("USD") @db.Char(3) // display formatting only; no FX conversion
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories    Category[]
+  transactions  Transaction[]
+  budgets       Budget[]
+  savingsGoals  SavingsGoal[]
+  contributions SavingsContribution[]
+
+  @@map("users")
+}
+
+model Category {
+  id     String       @id @default(cuid())
+  userId String
+  name   String       @db.VarChar(60)
+  type   CategoryType
+
+  color      String  @default("#64748b") @db.VarChar(7) // hex; validated server-side when writes exist
+  icon       String? @db.VarChar(40)
+  isArchived Boolean @default(false) // soft delete: categories with transaction history must not vanish
+  isSystem   Boolean @default(false) // true for seeded default categories
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([userId, type, name])
+  @@unique([id, userId]) // target of the composite same-owner FK added in the migration
+  @@index([userId, isArchived, sortOrder])
+  @@map("categories")
+}
+
+model Transaction {
+  id     String @id @default(cuid())
+  userId String
+
+  amountCents Int // always positive; direction is carried by `type`, never by sign
+  type        TransactionType
+  date        DateTime        @db.Date // calendar date, not an instant — avoids timezone month-drift
+
+  description String  @db.VarChar(200)
+  notes       String? @db.VarChar(1000)
+  categoryId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date(sort: Desc), id]) // primary list ordering + keyset pagination
+  @@index([userId, categoryId, date]) // category filter + per-category rollups
+  @@index([userId, type, date]) // income/expense split for monthly summaries
+  @@index([userId, amountCents]) // amount-range filter
+  @@map("transactions")
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String
+  categoryId  String
+  periodStart DateTime @db.Date // always the first day of the budgeted month
+  amountCents Int
+  notes       String?  @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId, periodStart])
+  @@index([userId, periodStart])
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id            String     @id @default(cuid())
+  userId        String
+  name          String     @db.VarChar(80)
+  description   String?    @db.VarChar(500)
+  targetCents   Int
+  startingCents Int        @default(0) // progress = startingCents + SUM(contributions.amountCents)
+  targetDate    DateTime?  @db.Date
+  status        GoalStatus @default(ACTIVE)
+  color         String     @default("#0ea5e9") @db.VarChar(7)
+  achievedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions SavingsContribution[]
+
+  @@unique([userId, name])
+  @@index([userId, status, targetDate])
+  @@map("savings_goals")
+}
+
+// Progress is derived from this ledger rather than a mutable `currentCents`
+// column on SavingsGoal: it gives contribution history for free (useful for
+// a progress-over-time chart later), and it removes the drift risk of a
+// denormalized running total that a failed write could desynchronize.
+model SavingsContribution {
+  id          String   @id @default(cuid())
+  userId      String
+  goalId      String
+  amountCents Int // may be negative — a withdrawal
+  date        DateTime @db.Date
+  note        String?  @db.VarChar(200)
+  createdAt   DateTime @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, date])
+  @@index([userId, date])
+  @@map("savings_contributions")
+}
