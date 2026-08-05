@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-const NAV_ITEMS = [{ href: "/transactions", label: "Transactions" }];
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/transactions", label: "Transactions" },
+];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
