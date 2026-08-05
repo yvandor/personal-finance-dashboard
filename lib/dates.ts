@@ -88,3 +88,15 @@ export function monthKeyRange(monthKey: string): { start: string; end: string } 
     end: `${monthKey}-${pad2(lastDayOfMonth(year, month0))}`,
   };
 }
+
+/** "YYYY-MM" for the current UTC month -- the default when no month filter is given (e.g. a fresh /budgets load). */
+export function currentMonthKey(now: Date = new Date()): string {
+  return `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}`;
+}
+
+/** "YYYY-MM" shifted by `delta` months (negative for earlier) -- backs the budgets page's prev/next month navigation. */
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const shifted = addMonths(year, month - 1, delta);
+  return `${shifted.year}-${pad2(shifted.month0 + 1)}`;
+}

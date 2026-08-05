@@ -2,12 +2,14 @@ import { getDashboardSummary, getMonthlyTrend, getCategoryBreakdown } from "@/se
 import { listTransactions } from "@/server/data/transactions";
 import { listCategories } from "@/server/data/categories";
 import { getCurrentUserCurrency } from "@/server/data/users";
+import { getCurrentMonthBudgetStatus } from "@/server/data/budgets";
 import { dashboardFilterSchema } from "@/lib/schemas/dashboard";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { CategoryBreakdownChart } from "@/components/dashboard/CategoryBreakdownChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
+import { BudgetStatusSummary } from "@/components/dashboard/BudgetStatusSummary";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -31,13 +33,14 @@ export default async function DashboardPage({
   // caller.
   const { period } = dashboardFilterSchema.parse(rawFilters);
 
-  const [summary, trend, breakdown, recent, categories, currency] = await Promise.all([
+  const [summary, trend, breakdown, recent, categories, currency, budgetStatus] = await Promise.all([
     getDashboardSummary(rawFilters),
     getMonthlyTrend(rawFilters),
     getCategoryBreakdown(rawFilters),
     listTransactions({ take: 5 }),
     listCategories(),
     getCurrentUserCurrency(),
+    getCurrentMonthBudgetStatus(),
   ]);
 
   return (
@@ -51,6 +54,8 @@ export default async function DashboardPage({
       </div>
 
       <DashboardSummaryCards summary={summary} currency={currency} />
+
+      <BudgetStatusSummary status={budgetStatus} currency={currency} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TrendChart data={trend} currency={currency} />

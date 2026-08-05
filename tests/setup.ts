@@ -16,6 +16,12 @@ export const OTHER_USER_ID = "other-test-user";
 export async function resetTestData(): Promise<void> {
   const userIds = [DEV_USER_ID, OTHER_USER_ID];
   await prisma.transaction.deleteMany({ where: { userId: { in: userIds } } });
+  // Explicit, not relied-upon-via-cascade: Budget.categoryId is
+  // onDelete: Cascade, so deleting categories below would delete budgets
+  // too as a side effect -- but a test suite's cleanup shouldn't depend on
+  // that relationship never changing (see server/data/budgets.ts's comment
+  // on why that cascade is itself a flagged, not-yet-addressed concern).
+  await prisma.budget.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.category.deleteMany({ where: { userId: { in: userIds } } });
 
   // `update` is non-empty and resets every mutable field a test might have

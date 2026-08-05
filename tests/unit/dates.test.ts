@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePeriodRange, monthKeyRange } from "@/lib/dates";
+import { resolvePeriodRange, monthKeyRange, currentMonthKey, shiftMonthKey } from "@/lib/dates";
 
 // A fixed reference "now" throughout -- these are relative-period
 // calculations ("current month", "current year"), so every test injects
@@ -61,5 +61,28 @@ describe("monthKeyRange", () => {
   it("returns the first and last day of the given month", () => {
     expect(monthKeyRange("2026-03")).toEqual({ start: "2026-03-01", end: "2026-03-31" });
     expect(monthKeyRange("2028-02")).toEqual({ start: "2028-02-01", end: "2028-02-29" });
+  });
+});
+
+describe("currentMonthKey", () => {
+  it("returns the UTC year-month of the given (or real) now", () => {
+    expect(currentMonthKey(NOW)).toBe("2026-03");
+    expect(currentMonthKey(new Date("2026-12-31T23:00:00Z"))).toBe("2026-12");
+  });
+});
+
+describe("shiftMonthKey", () => {
+  it("shifts forward and backward within a year", () => {
+    expect(shiftMonthKey("2026-03", 1)).toBe("2026-04");
+    expect(shiftMonthKey("2026-03", -1)).toBe("2026-02");
+  });
+
+  it("crosses a year boundary in both directions", () => {
+    expect(shiftMonthKey("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonthKey("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("is a no-op with a zero delta", () => {
+    expect(shiftMonthKey("2026-06", 0)).toBe("2026-06");
   });
 });
