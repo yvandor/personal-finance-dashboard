@@ -187,6 +187,20 @@ tests/
 
 `vitest.config.mts` loads `.env.test` and sets the `react-server` module-resolution condition that `server-only`-guarded files need outside of Next's own bundler. Integration tests wipe and reseed a fixed dev user and a second test user before each test (`tests/setup.ts`) — point `.env.test` at a database that's safe to truncate.
 
+## End-to-end tests
+
+A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, the dashboard, and dialog accessibility/focus behavior — in a real browser against a real running app.
+
+```bash
+cp .env.e2e.example .env.e2e   # a THIRD database, separate from finance_dev and .env.test's
+npx playwright install chromium
+npm run test:e2e
+```
+
+`playwright.config.ts` loads `.env.e2e` and starts the app itself (`next dev`) on a dedicated port (3100), always fresh (`reuseExistingServer: false`) — reusing "whatever's already running" is exactly how an E2E run could end up silently pointed at a real `npm run dev` session against `finance_dev` instead; the separate port makes that structurally impossible rather than a config convention to trust. `e2e/global-setup.ts` applies migrations; every spec resets and reseeds a fixed category set before each test (`e2e/fixtures.ts`) using its own distinct identity (`DEV_USER_ID=e2e-dev-user`), and `e2e/global-teardown.ts` leaves the database fully empty when the suite finishes. The suite runs fully serial (`workers: 1`) — this app has exactly one identity and no per-test tenancy (see `server/context.ts`), so order-independence comes from resetting to a known state before every test, not from parallel isolation the app doesn't have yet.
+
+The generated Prisma client (`app/generated/prisma`) is ESM-only, which conflicts with Playwright Test's CJS-oriented module loader — `e2e/` has its own nested `package.json` (`{"type": "module"}`) so Node treats files there as ESM, and the two scripts that actually touch the database (`e2e/reset-data.ts`, `e2e/wipe-data.ts`) run as fully separate child processes rather than being imported into Playwright's own process, sidestepping the interop issue entirely.
+
 ## CI workflow
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request against a throwaway **Postgres 17 service container**, in this order:
@@ -202,6 +216,8 @@ tests/
 | Production build | `npm run build` |
 
 Every one of those can be run locally in the same order — see the table above. The only thing CI doesn't cover is a manual smoke test against the long-lived local dev database, which is a deliberate call: the integration suite already exercises the same code paths against a real database on every run.
+
+A separate `e2e` job runs the Playwright suite in parallel with the job above (its own Postgres service container, `finance_e2e`), installing only Chromium and uploading the HTML report as an artifact on failure only.
 
 ## Accessibility
 

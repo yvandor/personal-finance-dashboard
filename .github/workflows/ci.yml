@@ -60,3 +60,68 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # A separate job (not steps appended to `ci` above) so it runs in
+  # parallel rather than lengthening that job's critical path, and so a
+  # Playwright failure is reported distinctly from a unit/build failure.
+  # Its own Postgres service container, entirely separate from the `ci`
+  # job's -- a genuinely dedicated E2E database, never finance_dev, with
+  # its own throwaway, container-local credentials meaningless outside
+  # this job (same pattern as the `ci` job's own service credentials).
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: finance_e2e
+          POSTGRES_PASSWORD: finance_e2e_ci_password
+          POSTGRES_DB: finance_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U finance_e2e"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: "postgresql://finance_e2e:finance_e2e_ci_password@localhost:5432/finance_e2e?schema=public"
+      DEV_USER_ID: "e2e-dev-user"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # Chromium only, not the full browser matrix -- this is a smoke
+      # suite for critical journeys, not a cross-browser compatibility
+      # gate; keeping it to one browser is what keeps it fast.
+      - name: Install Playwright's Chromium browser
+        run: npx playwright install --with-deps chromium
+
+      # Migrations are applied by e2e/global-setup.ts itself (via
+      # `prisma migrate deploy`), so `npx playwright test` is the single,
+      # complete, self-sufficient command -- identical locally and in CI.
+      - name: Run Playwright E2E suite
+        run: npx playwright test
+        env:
+          CI: true
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
