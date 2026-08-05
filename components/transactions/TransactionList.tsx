@@ -6,13 +6,14 @@ import type { CategoryDTO } from "@/server/data/categories";
 interface TransactionListProps {
   transactions: TransactionDTO[];
   categories: CategoryDTO[];
+  currency?: string;
   hasActiveFilters: boolean;
 }
 
 // Renders both the desktop table and the mobile card list, one CSS-hidden
 // via Tailwind breakpoints -- no client JS, no duplicate data fetch, just
 // slightly more server-rendered HTML than a single shared tree would send.
-export function TransactionList({ transactions, categories, hasActiveFilters }: TransactionListProps) {
+export function TransactionList({ transactions, categories, currency, hasActiveFilters }: TransactionListProps) {
   const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
 
   if (transactions.length === 0) {
@@ -62,6 +63,7 @@ export function TransactionList({ transactions, categories, hasActiveFilters }: 
               transaction={t}
               categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
               categories={categories}
+              currency={currency}
             />
           ))}
         </tbody>
@@ -74,6 +76,7 @@ export function TransactionList({ transactions, categories, hasActiveFilters }: 
             transaction={t}
             categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
             categories={categories}
+            currency={currency}
           />
         ))}
       </div>

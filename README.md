@@ -19,7 +19,7 @@ A privacy-first, manual-entry personal finance tracker. Log income and expenses,
 
 ## Why this exists
 
-Bank statements are transaction-level and category-free. DIY spreadsheets rot. Aggregators that scrape your bank require handing over credentials, which a meaningful share of privacy-conscious people will simply refuse. This project's position: **manual entry is the product, not a limitation** — the tradeoff we accept is that you type in your own transactions; the tradeoff we're building to win is that entry is fast and the resulting picture is immediate. See [`docs/PROJECT_PLAN.md`](../docs/PROJECT_PLAN.md) (one level up, at the repo's outer root) for the full product and architecture plan this build follows.
+Bank statements are transaction-level and category-free. DIY spreadsheets rot. Aggregators that scrape your bank require handing over credentials, which a meaningful share of privacy-conscious people will simply refuse. This project's position: **manual entry is the product, not a limitation** — the tradeoff we accept is that you type in your own transactions; the tradeoff we're building to win is that entry is fast and the resulting picture is immediate. See **[`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)** for the full product and architecture plan this build follows.
 
 ## Features
 
@@ -219,7 +219,7 @@ Every one of those can be run locally in the same order — see the table above.
 - **Server-side validation is the only enforcement point that counts**; any client-side validation is UX only, and every Server Action re-parses input from scratch.
 - **Money is integer cents end to end** — no floats in storage, computation, or over-the-wire payloads — eliminating an entire class of rounding/precision bugs in a domain where they're unacceptable.
 - **No secrets committed** — `.env*` is git-ignored except the `*.example` templates, which list variable names only.
-- Full threat model, session-strategy recommendations, and the pre-auth deployment gate (**this app must never be deployed to a public host before authentication lands**) are documented in [`docs/PROJECT_PLAN.md`](../docs/PROJECT_PLAN.md) §8.
+- Full threat model, session-strategy recommendations, and the pre-auth deployment gate (**this app must never be deployed to a public host before authentication lands**) are documented in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §8.
 
 ## Roadmap
 
@@ -238,7 +238,7 @@ Deliberately out of MVP scope, tracked in the project plan as post-MVP candidate
 
 ## Contributing
 
-This is currently a solo learning/portfolio project built in explicit, reviewed phases (see `docs/PROJECT_PLAN.md` §10 for the phase breakdown). Issues and suggestions are welcome. If you'd like to contribute code:
+This is currently a solo learning/portfolio project built in explicit, reviewed phases (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 for the phase breakdown). Issues and suggestions are welcome. If you'd like to contribute code:
 
 1. Open an issue describing the change before sending a large PR — this project follows an explicit plan-then-build process, and unplanned scope (see the plan's "explicitly out of scope" table) will likely be declined.
 2. Run the full local check suite before opening a PR: `npx tsc --noEmit && npx eslint . && npm run test && npm run build`.

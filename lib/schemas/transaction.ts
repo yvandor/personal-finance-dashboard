@@ -43,11 +43,29 @@ export const transactionUpdateSchema = transactionCreateSchema.partial().strict(
 
 export type TransactionUpdateInput = z.infer<typeof transactionUpdateSchema>;
 
+// A cursor identifies a row by its (date, id) position in the
+// `[userId, date desc, id desc]` index — the same compound key the DAL
+// sorts by. Encoded as plain "YYYY-MM-DD_<cuid>" (not sensitive; the id is
+// already visible in the page), validated here so a malformed cursor is a
+// 400 at the schema boundary rather than a confusing query downstream.
+const cursorSchema = z.string().regex(
+  /^\d{4}-\d{2}-\d{2}_[a-z0-9]+$/,
+  "Expected a cursor in the form YYYY-MM-DD_<id>",
+);
+
 // Search/filter input for listing transactions. Parsed into this closed
 // shape rather than passed through as a raw object — this is what prevents
 // both Prisma filter-operator injection (a client passing something like
 // `{ "userId": { "not": null } }`) and unbounded-result DoS (`take` is
 // always bounded).
+//
+// Pagination is keyset (cursor-based), not offset (`skip`): `skip` requires
+// Postgres to scan and discard every prior row, which degrades linearly as
+// a user's history grows, despite the `[userId, date(sort: Desc), id]`
+// index existing specifically to make cursor-based paging a plain indexed
+// range scan instead. `direction` only matters together with a `cursor` —
+// with no cursor, the query starts from the most recent transaction
+// regardless of `direction`'s default.
 export const transactionFilterSchema = z
   .object({
     type: transactionTypeSchema.optional(),
@@ -56,7 +74,8 @@ export const transactionFilterSchema = z
     dateTo: dateOnly.optional(),
     q: z.string().trim().max(100).optional(),
     take: z.coerce.number().int().min(1).max(100).default(50),
-    skip: z.coerce.number().int().min(0).default(0),
+    cursor: cursorSchema.optional(),
+    direction: z.enum(["next", "prev"]).default("next"),
   })
   .strict();
 

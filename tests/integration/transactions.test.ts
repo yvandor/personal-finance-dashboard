@@ -378,12 +378,13 @@ describe("transactions DAL", () => {
           categoryId: cat.id,
         });
       }
-      const { items, total } = await listTransactions({ take: 2 });
+      const { items, total, hasNext } = await listTransactions({ take: 2 });
       expect(items).toHaveLength(2);
       expect(total).toBe(5);
+      expect(hasNext).toBe(true);
     });
 
-    it("pages through results with skip", async () => {
+    it("pages forward through results with a keyset cursor, with no overlap or gaps", async () => {
       const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Cat");
       for (let i = 1; i <= 3; i += 1) {
         await createTransaction({
@@ -394,12 +395,104 @@ describe("transactions DAL", () => {
           categoryId: cat.id,
         });
       }
-      const page1 = await listTransactions({ take: 2, skip: 0 });
-      const page2 = await listTransactions({ take: 2, skip: 2 });
+      const page1 = await listTransactions({ take: 2 });
       expect(page1.items).toHaveLength(2);
+      expect(page1.hasNext).toBe(true);
+      expect(page1.hasPrev).toBe(false);
+      expect(page1.nextCursor).not.toBeNull();
+
+      const page2 = await listTransactions({ take: 2, cursor: page1.nextCursor!, direction: "next" });
       expect(page2.items).toHaveLength(1);
+      expect(page2.hasNext).toBe(false);
+      expect(page2.hasPrev).toBe(true);
+
       const allIds = [...page1.items, ...page2.items].map((t) => t.id);
       expect(new Set(allIds).size).toBe(3); // no overlap, no gaps
+    });
+
+    it("pages backward from a cursor and returns to the original first page", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Cat");
+      for (let i = 1; i <= 3; i += 1) {
+        await createTransaction({
+          type: "EXPENSE",
+          amountCents: 100,
+          date: `2026-03-0${i}`,
+          description: `Item ${i}`,
+          categoryId: cat.id,
+        });
+      }
+      const page1 = await listTransactions({ take: 2 });
+      const page2 = await listTransactions({ take: 2, cursor: page1.nextCursor!, direction: "next" });
+
+      const backToPage1 = await listTransactions({
+        take: 2,
+        cursor: page2.prevCursor!,
+        direction: "prev",
+      });
+      expect(backToPage1.items.map((t) => t.id)).toEqual(page1.items.map((t) => t.id));
+      expect(backToPage1.hasPrev).toBe(false);
+    });
+
+    it("never skips or duplicates rows when multiple transactions share the same date", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Cat");
+      // Five transactions on the SAME date -- a cursor keyed on date alone
+      // (no id tiebreaker) would split these unpredictably across pages.
+      for (let i = 1; i <= 5; i += 1) {
+        await createTransaction({
+          type: "EXPENSE",
+          amountCents: 100 + i,
+          date: "2026-03-15",
+          description: `Same-day item ${i}`,
+          categoryId: cat.id,
+        });
+      }
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10; page += 1) {
+        const result: Awaited<ReturnType<typeof listTransactions>> = await listTransactions(
+          cursor ? { take: 2, cursor, direction: "next" } : { take: 2 },
+        );
+        seen.push(...result.items.map((t) => t.id));
+        if (!result.hasNext) break;
+        cursor = result.nextCursor;
+      }
+
+      expect(seen).toHaveLength(5);
+      expect(new Set(seen).size).toBe(5); // no duplicates
+    });
+
+    it("keeps filters applied across a keyset page boundary", async () => {
+      const expenseCat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Expenses");
+      const incomeCat = await createTestCategory(DEV_USER_ID, "INCOME", "Income");
+      for (let i = 1; i <= 3; i += 1) {
+        await createTransaction({
+          type: "EXPENSE",
+          amountCents: 100,
+          date: `2026-03-0${i}`,
+          description: `Expense ${i}`,
+          categoryId: expenseCat.id,
+        });
+      }
+      await createTransaction({
+        type: "INCOME",
+        amountCents: 5000,
+        date: "2026-03-02",
+        description: "Paycheck",
+        categoryId: incomeCat.id,
+      });
+
+      const page1 = await listTransactions({ type: "EXPENSE", take: 2 });
+      expect(page1.items.every((t) => t.type === "EXPENSE")).toBe(true);
+
+      const page2 = await listTransactions({
+        type: "EXPENSE",
+        take: 2,
+        cursor: page1.nextCursor!,
+        direction: "next",
+      });
+      expect(page2.items).toHaveLength(1);
+      expect(page2.items.every((t) => t.type === "EXPENSE")).toBe(true);
     });
   });
 });

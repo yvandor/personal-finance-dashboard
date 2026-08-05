@@ -18,15 +18,20 @@ export async function resetTestData(): Promise<void> {
   await prisma.transaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.category.deleteMany({ where: { userId: { in: userIds } } });
 
+  // `update` is non-empty and resets every mutable field a test might have
+  // touched (e.g. currency) -- an empty `update: {}` would only apply on
+  // first creation, silently leaking one test's mutation into every test
+  // that runs after it in a later suite run, since the row already exists
+  // from here on.
   await prisma.user.upsert({
     where: { id: DEV_USER_ID },
     create: { id: DEV_USER_ID, email: "dev-test@example.invalid" },
-    update: {},
+    update: { currency: "USD" },
   });
   await prisma.user.upsert({
     where: { id: OTHER_USER_ID },
     create: { id: OTHER_USER_ID, email: "other-test@example.invalid" },
-    update: {},
+    update: { currency: "USD" },
   });
 }
 

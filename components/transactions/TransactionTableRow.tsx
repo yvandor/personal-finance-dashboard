@@ -8,9 +8,10 @@ interface TransactionTableRowProps {
   transaction: TransactionDTO;
   categoryName: string;
   categories: CategoryDTO[];
+  currency?: string;
 }
 
-export function TransactionTableRow({ transaction, categoryName, categories }: TransactionTableRowProps) {
+export function TransactionTableRow({ transaction, categoryName, categories, currency }: TransactionTableRowProps) {
   const signedCents = transaction.type === "EXPENSE" ? -transaction.amountCents : transaction.amountCents;
 
   return (
@@ -20,7 +21,7 @@ export function TransactionTableRow({ transaction, categoryName, categories }: T
       <td className="whitespace-nowrap px-4 py-3 text-sm text-muted">{categoryName}</td>
       <td className="whitespace-nowrap px-4 py-3 text-sm capitalize text-muted">{transaction.type.toLowerCase()}</td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium">
-        <Money cents={signedCents} />
+        <Money cents={signedCents} currency={currency} />
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-right">
         <div className="flex justify-end gap-1">

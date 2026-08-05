@@ -1,41 +1,45 @@
 import Link from "next/link";
 
 interface PagerProps {
-  take: number;
-  skip: number;
+  itemsCount: number;
   total: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  nextCursor: string | null;
+  prevCursor: string | null;
   searchParams: Record<string, string | undefined>;
 }
 
-function buildHref(searchParams: Record<string, string | undefined>, skip: number): string {
+function buildHref(
+  searchParams: Record<string, string | undefined>,
+  cursor: string,
+  direction: "next" | "prev",
+): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
-    if (value && key !== "skip") params.set(key, value);
+    if (value && key !== "cursor" && key !== "direction") params.set(key, value);
   }
-  if (skip > 0) params.set("skip", String(skip));
-  const query = params.toString();
-  return query ? `/transactions?${query}` : "/transactions";
+  params.set("cursor", cursor);
+  params.set("direction", direction);
+  return `/transactions?${params.toString()}`;
 }
 
-// Server-rendered prev/next links driven by the take/skip already supported
-// by listTransactions() -- no client-side pagination state to keep in sync.
-export function Pager({ take, skip, total, searchParams }: PagerProps) {
+// Cursor-based (keyset) pagination -- see server/data/transactions.ts. There
+// is no cheap "page 3 of 12" to show without the same offset-counting
+// keyset pagination exists to avoid, so this reports how many of the total
+// are on the current page rather than a numeric range.
+export function Pager({ itemsCount, total, hasNext, hasPrev, nextCursor, prevCursor, searchParams }: PagerProps) {
   if (total === 0) return null;
-
-  const hasPrev = skip > 0;
-  const hasNext = skip + take < total;
-  const start = skip + 1;
-  const end = Math.min(skip + take, total);
 
   return (
     <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
       <span>
-        Showing {start}–{end} of {total}
+        Showing {itemsCount} of {total}
       </span>
       <nav className="flex gap-2" aria-label="Pagination">
-        {hasPrev ? (
+        {hasPrev && prevCursor ? (
           <Link
-            href={buildHref(searchParams, Math.max(0, skip - take))}
+            href={buildHref(searchParams, prevCursor, "prev")}
             className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-hover"
           >
             Previous
@@ -45,9 +49,9 @@ export function Pager({ take, skip, total, searchParams }: PagerProps) {
             Previous
           </span>
         )}
-        {hasNext ? (
+        {hasNext && nextCursor ? (
           <Link
-            href={buildHref(searchParams, skip + take)}
+            href={buildHref(searchParams, nextCursor, "next")}
             className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-hover"
           >
             Next

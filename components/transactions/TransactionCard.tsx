@@ -8,9 +8,10 @@ interface TransactionCardProps {
   transaction: TransactionDTO;
   categoryName: string;
   categories: CategoryDTO[];
+  currency?: string;
 }
 
-export function TransactionCard({ transaction, categoryName, categories }: TransactionCardProps) {
+export function TransactionCard({ transaction, categoryName, categories, currency }: TransactionCardProps) {
   const signedCents = transaction.type === "EXPENSE" ? -transaction.amountCents : transaction.amountCents;
 
   return (
@@ -22,7 +23,7 @@ export function TransactionCard({ transaction, categoryName, categories }: Trans
             {categoryName} · {transaction.date}
           </p>
         </div>
-        <Money cents={signedCents} className="shrink-0 font-medium" />
+        <Money cents={signedCents} currency={currency} className="shrink-0 font-medium" />
       </div>
       <div className="mt-3 flex gap-2">
         <TransactionFormDialog

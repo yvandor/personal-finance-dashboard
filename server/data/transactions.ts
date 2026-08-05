@@ -109,27 +109,94 @@ function buildWhere(
   };
 }
 
+interface Cursor {
+  date: string;
+  id: string;
+}
+
+function encodeCursor(row: Pick<Transaction, "date" | "id">): string {
+  return `${toDateOnly(row.date)}_${row.id}`;
+}
+
+// The schema's regex already guarantees this shape, so this never throws --
+// it's a plain split, not a second validation pass.
+function decodeCursor(cursor: string): Cursor {
+  const separatorIndex = cursor.indexOf("_");
+  return { date: cursor.slice(0, separatorIndex), id: cursor.slice(separatorIndex + 1) };
+}
+
+// Keyset ("(date, id) < cursor") rather than `skip` -- the row-comparison
+// needs BOTH columns, not just `date`, or two transactions sharing a date
+// would be split unpredictably between pages (a row could be skipped
+// entirely, or repeated on both pages, depending on where Postgres happened
+// to put it within that date). `id` is the tiebreaker for a reason: it's
+// unique, so "same date, smaller id" is always well-defined and never ties.
+//
+// `after` follows the [userId, date desc, id desc] index's own order
+// (strictly further down the list); `before` is its mirror, used for the
+// "Previous" direction.
+function afterCursor(cursor: Cursor): Prisma.TransactionWhereInput {
+  return {
+    OR: [{ date: { lt: new Date(cursor.date) } }, { date: new Date(cursor.date), id: { lt: cursor.id } }],
+  };
+}
+
+function beforeCursor(cursor: Cursor): Prisma.TransactionWhereInput {
+  return {
+    OR: [{ date: { gt: new Date(cursor.date) } }, { date: new Date(cursor.date), id: { gt: cursor.id } }],
+  };
+}
+
 export interface ListTransactionsResult {
   items: TransactionDTO[];
   total: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  nextCursor: string | null;
+  prevCursor: string | null;
 }
 
 export async function listTransactions(rawFilters: unknown = {}): Promise<ListTransactionsResult> {
   const userId = await requireUserId();
   const filters = transactionFilterSchema.parse(rawFilters);
-  const where = buildWhere(userId, filters);
+  const baseWhere = buildWhere(userId, filters);
+  const cursor = filters.cursor ? decodeCursor(filters.cursor) : null;
+  const goingPrev = cursor !== null && filters.direction === "prev";
 
-  const [items, total] = await Promise.all([
-    prisma.transaction.findMany({
-      where,
-      orderBy: [{ date: "desc" }, { id: "desc" }],
-      take: filters.take,
-      skip: filters.skip,
-    }),
-    prisma.transaction.count({ where }),
+  // Fetch one extra row beyond the page size ("peek") so hasNext/hasPrev
+  // are answered by the query itself -- no separate existence check, no
+  // relying on a total count that a `skip`-free design otherwise wouldn't
+  // need at all (kept below only because the UI still displays it).
+  const where: Prisma.TransactionWhereInput = cursor
+    ? { AND: [baseWhere, goingPrev ? beforeCursor(cursor) : afterCursor(cursor)] }
+    : baseWhere;
+  const orderBy: Prisma.TransactionOrderByWithRelationInput[] = goingPrev
+    ? [{ date: "asc" }, { id: "asc" }]
+    : [{ date: "desc" }, { id: "desc" }];
+
+  const [rows, total] = await Promise.all([
+    prisma.transaction.findMany({ where, orderBy, take: filters.take + 1 }),
+    prisma.transaction.count({ where: baseWhere }),
   ]);
 
-  return { items: items.map(toDTO), total };
+  const hasExtra = rows.length > filters.take;
+  const pageRows = hasExtra ? rows.slice(0, filters.take) : rows;
+  // `beforeCursor` fetches ascending (nearest-to-cursor first) so the
+  // `take + 1` peek trims the right end; flip back to the usual
+  // newest-first display order before returning.
+  const orderedRows = goingPrev ? pageRows.reverse() : pageRows;
+
+  const hasNext = goingPrev ? true : hasExtra;
+  const hasPrev = goingPrev ? hasExtra : cursor !== null;
+
+  return {
+    items: orderedRows.map(toDTO),
+    total,
+    hasNext,
+    hasPrev,
+    nextCursor: orderedRows.length > 0 ? encodeCursor(orderedRows[orderedRows.length - 1]) : null,
+    prevCursor: orderedRows.length > 0 ? encodeCursor(orderedRows[0]) : null,
+  };
 }
 
 export interface TransactionsSummary {

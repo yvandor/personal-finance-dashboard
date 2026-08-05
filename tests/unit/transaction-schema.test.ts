@@ -130,16 +130,35 @@ describe("transactionUpdateSchema", () => {
 });
 
 describe("transactionFilterSchema", () => {
-  it("defaults take to 50 and skip to 0", () => {
+  it("defaults take to 50, direction to next, and cursor to undefined", () => {
     const result = transactionFilterSchema.parse({});
     expect(result.take).toBe(50);
-    expect(result.skip).toBe(0);
+    expect(result.direction).toBe("next");
+    expect(result.cursor).toBeUndefined();
   });
 
-  it("coerces take/skip from query-param-style strings", () => {
-    const result = transactionFilterSchema.parse({ take: "10", skip: "20" });
+  it("coerces take from a query-param-style string", () => {
+    const result = transactionFilterSchema.parse({ take: "10" });
     expect(result.take).toBe(10);
-    expect(result.skip).toBe(20);
+  });
+
+  it("accepts a valid cursor with an explicit direction", () => {
+    const result = transactionFilterSchema.parse({
+      cursor: "2026-03-15_clh3ans2z0000356ub9pu9q0m",
+      direction: "prev",
+    });
+    expect(result.cursor).toBe("2026-03-15_clh3ans2z0000356ub9pu9q0m");
+    expect(result.direction).toBe("prev");
+  });
+
+  it("rejects a malformed cursor", () => {
+    expect(() => transactionFilterSchema.parse({ cursor: "not-a-cursor" })).toThrow();
+  });
+
+  it("rejects an invalid direction", () => {
+    expect(() =>
+      transactionFilterSchema.parse({ cursor: "2026-03-15_abc123", direction: "sideways" }),
+    ).toThrow();
   });
 
   it("rejects a take above 100", () => {

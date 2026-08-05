@@ -1,5 +1,6 @@
 import { listTransactions, getTransactionsSummary } from "@/server/data/transactions";
 import { listCategories } from "@/server/data/categories";
+import { getCurrentUserCurrency } from "@/server/data/users";
 import { transactionFilterSchema } from "@/lib/schemas/transaction";
 import { SummaryCards } from "@/components/transactions/SummaryCards";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
@@ -33,23 +34,26 @@ export default async function TransactionsPage({
     dateTo: toSingle(rawParams.dateTo),
     q: toSingle(rawParams.q),
     take: toSingle(rawParams.take),
-    skip: toSingle(rawParams.skip),
+    cursor: toSingle(rawParams.cursor),
+    direction: toSingle(rawParams.direction),
   };
 
-  // Parsed once here for the page's own use (pager numbers, active-filter
-  // check); listTransactions/getTransactionsSummary re-parse the same raw
-  // input themselves, since a DAL function must never trust an
-  // already-validated shape from its caller.
+  // Parsed once here for the page's own use (active-filter check);
+  // listTransactions/getTransactionsSummary re-parse the same raw input
+  // themselves, since a DAL function must never trust an already-validated
+  // shape from its caller.
   const filters = transactionFilterSchema.parse(rawFilters);
   const hasActiveFilters = Boolean(
     filters.type || filters.categoryId || filters.dateFrom || filters.dateTo || filters.q,
   );
 
-  const [categories, { items, total }, summary] = await Promise.all([
-    listCategories(),
-    listTransactions(rawFilters),
-    getTransactionsSummary(rawFilters),
-  ]);
+  const [categories, currency, { items, total, hasNext, hasPrev, nextCursor, prevCursor }, summary] =
+    await Promise.all([
+      listCategories(),
+      getCurrentUserCurrency(),
+      listTransactions(rawFilters),
+      getTransactionsSummary(rawFilters),
+    ]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
@@ -63,16 +67,24 @@ export default async function TransactionsPage({
         </TransactionFormDialog>
       </div>
 
-      <SummaryCards summary={summary} />
+      <SummaryCards summary={summary} currency={currency} />
 
       <TransactionFilters categories={categories} />
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <TransactionList transactions={items} categories={categories} hasActiveFilters={hasActiveFilters} />
+        <TransactionList
+          transactions={items}
+          categories={categories}
+          currency={currency}
+          hasActiveFilters={hasActiveFilters}
+        />
         <Pager
-          take={filters.take}
-          skip={filters.skip}
+          itemsCount={items.length}
           total={total}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          nextCursor={nextCursor}
+          prevCursor={prevCursor}
           searchParams={Object.fromEntries(Object.entries(rawParams).map(([k, v]) => [k, toSingle(v)]))}
         />
       </div>

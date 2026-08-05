@@ -41,7 +41,19 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         if (e.target === ref.current) onClose();
       }}
       aria-labelledby={titleId}
-      className="w-full max-w-lg rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/50"
+      // The native <dialog> UA stylesheet centers a modal dialog via
+      // `position:fixed; inset:0; margin:auto` -- but Tailwind's Preflight
+      // reset (`*, ::before, ::after { margin: 0 }`) is author-origin CSS,
+      // which overrides a user-agent-origin rule regardless of selector
+      // specificity. That zeroes the one property (`margin`) doing the
+      // centering while leaving `position`/`inset` (which Preflight never
+      // touches) intact -- the dialog ends up pinned to the top-left
+      // instead of centered. `m-auto` restores it explicitly rather than
+      // relying on the UA default surviving future Tailwind/Preflight
+      // changes. On mobile, w-full already resolves to 100% of the
+      // available space, so there's no extra space for the auto margins to
+      // distribute -- this only changes desktop/tablet centering.
+      className="m-auto w-full max-w-lg rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/50"
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <h2 id={titleId} className="text-base font-semibold">

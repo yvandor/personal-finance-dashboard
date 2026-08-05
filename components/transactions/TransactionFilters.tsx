@@ -28,7 +28,9 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
     } else {
       params.delete(key);
     }
-    params.delete("skip"); // any filter change starts back at page 1
+    // any filter change starts back at the first page
+    params.delete("cursor");
+    params.delete("direction");
     router.push(params.size > 0 ? `${pathname}?${params.toString()}` : pathname);
   }
 
