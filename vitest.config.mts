@@ -34,5 +34,29 @@ export default defineConfig({
     // execution is cheap -- simpler than giving every file distinct user
     // ids or moving to per-test transactional rollback.
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      // Scoped to the modules this task's guardrails target -- money math
+      // and the transaction/budget/analytics DALs -- rather than the whole
+      // tree, so the thresholds mean something specific instead of being
+      // diluted by untested UI or config files that have their own
+      // (component-level, non-coverage-gated) test suite.
+      include: [
+        "lib/money.ts",
+        "server/data/transactions.ts",
+        "server/data/budgets.ts",
+        "server/data/dashboard.ts",
+      ],
+      // Set a few points below the actual coverage at the time these were
+      // added (statements 90.62%, branches 83.46%, functions 93.33%, lines
+      // 91.39%) -- enough buffer that a trivial refactor doesn't flake the
+      // gate, not so much that a real coverage regression slips through.
+      thresholds: {
+        lines: 88,
+        functions: 90,
+        branches: 80,
+        statements: 88,
+      },
+    },
   },
 });

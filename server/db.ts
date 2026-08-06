@@ -1,11 +1,12 @@
 import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/app/generated/prisma/client";
+import { serverEnv } from "@/server/env";
 
 // Prisma 7's generated client has no bundled query engine binary — it talks
 // to Postgres through an explicit driver adapter (`@prisma/adapter-pg`,
 // wrapping `pg`) instead of connecting from a bare connection string.
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg({ connectionString: serverEnv.DATABASE_URL });
 
 // Reused across Hot Module Replacement in dev so `next dev` doesn't open a
 // fresh connection pool on every file save.

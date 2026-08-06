@@ -43,6 +43,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fails the build on any high-or-critical severity advisory in the
+      # dependency tree. Runs early, before the slower steps below, so a
+      # known-vulnerable dependency fails fast rather than after a full
+      # build/test cycle.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       - name: Generate Prisma client
         run: npx prisma generate
 
@@ -66,6 +73,13 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+      # A separate step from the tests above (not folded into `npm run
+      # test`) so a coverage-threshold failure is reported distinctly from
+      # a plain test failure, and instrumentation doesn't slow the normal
+      # fast path.
+      - name: Coverage thresholds
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build

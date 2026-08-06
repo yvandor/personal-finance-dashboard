@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { serverEnv } from "@/server/env";
 
 /**
  * Resolves the "current user" for every server-side data access. This is
@@ -35,12 +36,7 @@ import { cache } from "react";
  * in tests.
  */
 export const requireUserId = cache(async (): Promise<string> => {
-  const id = process.env.DEV_USER_ID;
-  if (!id) {
-    throw new Error(
-      "DEV_USER_ID is not set. Authentication is not implemented yet — set " +
-        "DEV_USER_ID in your .env to the id of a seeded user. See server/context.ts.",
-    );
-  }
-  return id;
+  // serverEnv already validated DEV_USER_ID is present (and threw a clear,
+  // named error at import time if not) -- see server/env.ts.
+  return serverEnv.DEV_USER_ID;
 });

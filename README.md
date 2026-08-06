@@ -187,6 +187,14 @@ tests/
 
 `vitest.config.mts` loads `.env.test` and sets the `react-server` module-resolution condition that `server-only`-guarded files need outside of Next's own bundler. Integration tests wipe and reseed a fixed dev user and a second test user before each test (`tests/setup.ts`) — point `.env.test` at a database that's safe to truncate.
 
+### Coverage thresholds
+
+```bash
+npm run test:coverage
+```
+
+`vitest.config.mts` gates coverage (via `@vitest/coverage-v8`) on the modules where a silent regression would be most costly — `lib/money.ts` (the only arithmetic site) and the transaction, budget, and analytics (`server/data/dashboard.ts`) DALs — rather than the whole tree, so the numbers mean something specific instead of being diluted by untested UI. Thresholds (statements 88%, branches 80%, functions 90%, lines 88%) were set a few points below actual coverage at the time they were added, enough buffer that a trivial refactor doesn't flake the gate without letting a real regression through unnoticed.
+
 ## End-to-end tests
 
 A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, the dashboard, and dialog accessibility/focus behavior — in a real browser against a real running app.
@@ -208,16 +216,20 @@ The generated Prisma client (`app/generated/prisma`) is ESM-only, which conflict
 | Step | Command |
 |---|---|
 | Install | `npm ci` |
+| Audit dependencies | `npm audit --audit-level=high` |
 | Generate Prisma client | `npx prisma generate` |
 | Type check | `npx tsc --noEmit` |
 | Lint | `npx eslint .` |
 | Apply migrations | `npx prisma migrate deploy` |
 | Test (unit + integration) | `npm run test` |
+| Coverage thresholds | `npm run test:coverage` |
 | Production build | `npm run build` |
 
 Every one of those can be run locally in the same order — see the table above. The only thing CI doesn't cover is a manual smoke test against the long-lived local dev database, which is a deliberate call: the integration suite already exercises the same code paths against a real database on every run.
 
 A separate `e2e` job runs the Playwright suite in parallel with the job above (its own Postgres service container, `finance_e2e`), installing only Chromium and uploading the HTML report as an artifact on failure only.
+
+**Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) opens a weekly PR for outdated `npm` and `github-actions` dependencies — those PRs still have to pass the full CI pipeline above, including the audit gate, before merging.
 
 ## Accessibility
 
@@ -235,6 +247,10 @@ A separate `e2e` job runs the Playwright suite in parallel with the job above (i
 - **Server-side validation is the only enforcement point that counts**; any client-side validation is UX only, and every Server Action re-parses input from scratch.
 - **Money is integer cents end to end** — no floats in storage, computation, or over-the-wire payloads — eliminating an entire class of rounding/precision bugs in a domain where they're unacceptable.
 - **No secrets committed** — `.env*` is git-ignored except the `*.example` templates, which list variable names only.
+- **The DAL/Prisma import boundary is enforced by ESLint, not just convention** — `@typescript-eslint/no-restricted-imports` (`eslint.config.mjs`) fails the build if anything outside `server/data/**` imports the Prisma client singleton (`@/server/db`) or constructs a `PrismaClient`/adapter directly. Type-only imports of Prisma models/enums are exempted; `server/db.ts` itself, and test/seed/E2E fixtures (`tests/**`, `e2e/**`, `prisma/**`), are the only other exemptions.
+- **Server environment variables are Zod-validated at first import** (`server/env.ts`), not read ad hoc via `process.env.X` — a missing or empty `DATABASE_URL`/`DEV_USER_ID` fails loudly, naming which variable is missing (never its value), instead of surfacing later as a confusing Prisma connection error.
+- **Production security headers** (`next.config.ts`): a same-origin-by-default Content-Security-Policy, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and a `Permissions-Policy` denying camera/microphone/geolocation. The CSP's `script-src`/`style-src` `'unsafe-inline'` is **not** a dev-only allowance — Next.js 16's App Router injects its own inline bootstrap/hydration `<script>` tags in both dev and production, and real inline `style` attributes are used in production (e.g. `BudgetProgressBar`'s dynamic width, Recharts' SVG styling). Next.js's alternative — per-request CSP nonces via `proxy.ts` — was evaluated and rejected here because it requires forcing every page into dynamic rendering (no static optimization, ISR, or PPR), a real architecture change out of scope for this pass. The two allowances that genuinely are dev-only (`'unsafe-eval'` in `script-src`, the `ws://localhost`/`http://localhost` entries in `connect-src`) are gated on `NODE_ENV` and commented in `next.config.ts` as exactly that.
+- **`npm audit --audit-level=high` gates CI** (`.github/workflows/ci.yml`) — a high-or-critical severity advisory anywhere in the dependency tree fails the build. **Dependabot** (`.github/dependabot.yml`) opens weekly PRs for outdated `npm` and `github-actions` dependencies, which still have to pass this same gate.
 - Full threat model, session-strategy recommendations, and the pre-auth deployment gate (**this app must never be deployed to a public host before authentication lands**) are documented in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §8.
 
 ## Roadmap
@@ -246,7 +262,6 @@ Near-term, in the order the project plan sequences them:
 - [ ] **Savings goals** — target/progress tracking via a contribution ledger (schema already exists)
 - [ ] **Dashboard charts** — spending-by-category and monthly cash-flow trend, as their own `/dashboard` route
 - [ ] **Authentication (Auth.js)** — deliberately sequenced after the core UI; the schema and `requireUserId()` seam were designed for this from the first migration, so this becomes a swap of one function's body plus route protection, not a data-model rewrite
-- [ ] Enforce the DAL/Prisma import boundary with an ESLint `no-restricted-imports` rule (currently a convention, not yet a build-time check)
 
 ## Future features
 
@@ -257,7 +272,7 @@ Deliberately out of MVP scope, tracked in the project plan as post-MVP candidate
 This is currently a solo learning/portfolio project built in explicit, reviewed phases (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 for the phase breakdown). Issues and suggestions are welcome. If you'd like to contribute code:
 
 1. Open an issue describing the change before sending a large PR — this project follows an explicit plan-then-build process, and unplanned scope (see the plan's "explicitly out of scope" table) will likely be declined.
-2. Run the full local check suite before opening a PR: `npx tsc --noEmit && npx eslint . && npm run test && npm run build`.
+2. Run the full local check suite before opening a PR: `npx tsc --noEmit && npx eslint . && npm run test && npm run test:coverage && npm run build`.
 3. Keep the architecture invariants intact: no `prisma` import outside `server/data/**`, no `userId` accepted as a parameter anywhere, server-side Zod validation on every mutation.
 
 ## License
