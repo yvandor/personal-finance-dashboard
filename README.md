@@ -23,16 +23,18 @@ Bank statements are transaction-level and category-free. DIY spreadsheets rot. A
 
 ## Features
 
-Currently implemented (Phases 1–3 of the project plan):
+Currently implemented (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 for the full phase breakdown; phases below are not strictly sequential — Savings goals (Phase 4) is deferred behind Dashboard & charts (Phase 5)):
 
 - **Transaction CRUD** — add, edit, and delete income/expense transactions with server-validated amount, date, category, description, and optional notes
 - **Live summary cards** — income, expenses, and net totals for whatever the current filter/search shows
 - **Search and filter** — text search on description, plus type/category/date-range filters, all combining and persisted in the URL
 - **Keyset-paginated transaction list** — a real desktop table and a separate mobile card list, both server-rendered from the same query
+- **Budgets** — per-category monthly targets with live actual-vs-budget progress tracking (create/edit/delete)
+- **Dashboard analytics** (`/dashboard`) — spending-by-category breakdown and monthly cash-flow trend charts (Recharts), plus budget status summary
 - **Accessible, resilient forms** — labels tied to inputs, validation errors wired via `aria-describedby`/`aria-invalid`, and a failed submission never discards what you typed
 - **Per-user data isolation by construction** — every query is scoped through a single `requireUserId()` seam; no code path anywhere accepts a `userId` from the client
 
-Not yet built — see [Roadmap](#roadmap) below: budgets, savings goals, dashboard charts, authentication.
+Not yet built — see [Roadmap](#roadmap) below: categories UI (create/rename/archive), savings goals, authentication.
 
 ## Screenshots
 
@@ -44,7 +46,7 @@ Not yet built — see [Roadmap](#roadmap) below: budgets, savings goals, dashboa
 |---|---|
 | ![Add transaction dialog](docs/images/add-transaction-dialog.jpg) | ![Mobile layout](docs/images/mobile-layout.jpg) |
 
-*There is currently one route (`/transactions`) that serves as both the overview and the ledger — a dedicated `/dashboard` with charts is planned (see [Roadmap](#roadmap)). The mobile screenshot was captured with the real mobile-card markup rendered under a forced narrow viewport, because the sandboxed environment this was captured in could not shrink the actual browser window below ~1528px; the desktop screenshots reflect a genuine 1440px window.*
+*`/transactions` is the ledger view (list, search/filter, CRUD); `/dashboard` is the separate analytics route (summary cards, budget status, category and trend charts) — screenshots above are from `/transactions`, no `/dashboard` screenshot has been captured yet. The mobile screenshot was captured with the real mobile-card markup rendered under a forced narrow viewport, because the sandboxed environment this was captured in could not shrink the actual browser window below ~1528px; the desktop screenshots reflect a genuine 1440px window.*
 
 ## Architecture overview
 
@@ -90,7 +92,8 @@ lib/**               Dependency-free: money math (lib/money.ts), Zod schemas (li
 | ORM | [Prisma 7](https://www.prisma.io/) with `@prisma/adapter-pg` | Type-safe queries; the driver-adapter model means no bundled native engine binary |
 | Database | PostgreSQL 17 | `pg_trgm` trigram index powers substring description search |
 | Validation | [Zod](https://zod.dev/) `.strict()` schemas | Shared between client hints and server enforcement; `.strict()` rejects unknown keys outright — the mass-assignment guard |
-| Testing | [Vitest](https://vitest.dev/) | Unit tests for pure logic, integration tests against a real Postgres database (no Prisma mocking) |
+| Testing | [Vitest](https://vitest.dev/) + [React Testing Library](https://testing-library.com/react) + [Playwright](https://playwright.dev/) | Unit tests for pure logic, component tests (RTL), integration tests against a real Postgres database (no Prisma mocking), and a Playwright E2E smoke suite |
+| Charts | [Recharts](https://recharts.org/) | Category breakdown and monthly trend charts on `/dashboard` |
 | CI | GitHub Actions | Postgres service container; runs typecheck, lint, migrate, test, build on every push/PR |
 
 ## Folder structure
@@ -134,7 +137,7 @@ web/
 └── .github/workflows/ci.yml
 ```
 
-`prisma/schema.prisma` already defines `Budget`, `SavingsGoal`, and `SavingsContribution` models (see [Roadmap](#roadmap)) — the schema was designed up front for the full product, even though only `Category`/`Transaction` have a DAL, Server Actions, and UI so far.
+`prisma/schema.prisma` defines `Budget`, `SavingsGoal`, and `SavingsContribution` models — the schema was designed up front for the full product. `Category`, `Transaction`, and `Budget` now have a full DAL, Server Actions, and UI; `SavingsGoal`/`SavingsContribution` still have only the schema (see [Roadmap](#roadmap)).
 
 ## Installation
 
@@ -170,7 +173,7 @@ There is no authentication yet (see [Roadmap](#roadmap)). Every request acts as 
 npm run dev
 ```
 
-Visit `http://localhost:3000` — it redirects to `/transactions`, currently the app's only real page.
+Visit `http://localhost:3000` — it redirects to `/transactions`. `/dashboard` (analytics) and `/budgets` are also live routes.
 
 ## Running tests
 
@@ -180,10 +183,13 @@ npm run test
 
 ```
 tests/
-  unit/         Pure logic — Zod schema validation, money parsing/formatting. No database.
-  integration/  Real CRUD against a real Postgres database (tests/integration, using .env.test).
-                No mocking of Prisma — including the cross-user data-isolation suite.
+  unit/             Pure logic — Zod schema validation, money parsing/formatting. No database.
+  unit/components/  React Testing Library component tests (jsdom, no database).
+  integration/      Real CRUD against a real Postgres database (tests/integration, using .env.test).
+                     No mocking of Prisma — including the cross-user data-isolation suite.
 ```
+
+As of this writing: **211 Vitest tests** (unit + component + integration, via `npm run test`) plus a separate **10-test Playwright E2E suite** (see [End-to-end tests](#end-to-end-tests) below) — 221 automated tests total, all passing in CI on every push (`ci` and `e2e` jobs).
 
 `vitest.config.mts` loads `.env.test` and sets the `react-server` module-resolution condition that `server-only`-guarded files need outside of Next's own bundler. Integration tests wipe and reseed a fixed dev user and a second test user before each test (`tests/setup.ts`) — point `.env.test` at a database that's safe to truncate.
 
@@ -255,13 +261,13 @@ A separate `e2e` job runs the Playwright suite in parallel with the job above (i
 
 ## Roadmap
 
-Near-term, in the order the project plan sequences them:
+Not yet built:
 
 - [ ] **Categories UI** — create/rename/archive, with the documented reassign-or-block delete policy
-- [ ] **Budgets** — per-category monthly targets and actual-vs-budget progress (schema already exists)
 - [ ] **Savings goals** — target/progress tracking via a contribution ledger (schema already exists)
-- [ ] **Dashboard charts** — spending-by-category and monthly cash-flow trend, as their own `/dashboard` route
 - [ ] **Authentication (Auth.js)** — deliberately sequenced after the core UI; the schema and `requireUserId()` seam were designed for this from the first migration, so this becomes a swap of one function's body plus route protection, not a data-model rewrite
+
+**Recently shipped:** Budgets (per-category monthly targets with live actual-vs-budget progress) and Dashboard analytics (`/dashboard` — category breakdown and monthly trend charts) — see [Features](#features) above.
 
 ## Future features
 
