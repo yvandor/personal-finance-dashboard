@@ -4,12 +4,15 @@ import { useState, useTransition } from "react";
 import { archiveCategoryAction, unarchiveCategoryAction } from "@/server/actions/categories";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
+import type { CategoryManagementDTO } from "@/server/data/categories";
 
 interface ArchiveCategoryButtonProps {
   id: string;
   name: string;
   isArchived: boolean;
   transactionCount: number;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
 }
 
 // Two very different-weight actions share this component because they're
@@ -17,7 +20,13 @@ interface ArchiveCategoryButtonProps {
 // every picker and gets a confirm step (same ConfirmDialog pattern as
 // DeleteBudgetButton) since it changes what's offered app-wide; unarchiving
 // is simply reversing that and needs no confirmation.
-export function ArchiveCategoryButton({ id, name, isArchived, transactionCount }: ArchiveCategoryButtonProps) {
+export function ArchiveCategoryButton({
+  id,
+  name,
+  isArchived,
+  transactionCount,
+  onOptimisticUpdate,
+}: ArchiveCategoryButtonProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -25,6 +34,7 @@ export function ArchiveCategoryButton({ id, name, isArchived, transactionCount }
   function handleUnarchive() {
     setError(null);
     startTransition(async () => {
+      onOptimisticUpdate?.(id, { isArchived: false });
       const result = await unarchiveCategoryAction(id, null);
       if (!result.ok) {
         setError(result.error);
@@ -35,6 +45,7 @@ export function ArchiveCategoryButton({ id, name, isArchived, transactionCount }
   function handleArchiveConfirm() {
     setError(null);
     startTransition(async () => {
+      onOptimisticUpdate?.(id, { isArchived: true });
       const result = await archiveCategoryAction(id, null);
       if (result.ok) {
         setOpen(false);

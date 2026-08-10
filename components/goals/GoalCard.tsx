@@ -13,6 +13,8 @@ interface GoalCardProps {
   goal: SavingsGoalProgressDTO;
   contributions: ContributionDTO[];
   currency?: string;
+  onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
 function formatTargetDate(targetDate: string): string {
@@ -47,7 +49,7 @@ function PaceHint({ goal }: { goal: SavingsGoalProgressDTO }) {
   );
 }
 
-export function GoalCard({ goal, contributions, currency }: GoalCardProps) {
+export function GoalCard({ goal, contributions, currency, onOptimisticUpdate, onOptimisticRemove }: GoalCardProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
@@ -76,8 +78,10 @@ export function GoalCard({ goal, contributions, currency }: GoalCardProps) {
         {!goal.isAchieved && (
           <ContributionFormDialog
             goalId={goal.id}
+            goal={goal}
             triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
             triggerAriaLabel={`Add contribution to ${goal.name}`}
+            onOptimisticUpdate={onOptimisticUpdate}
           >
             Contribute
           </ContributionFormDialog>
@@ -87,6 +91,7 @@ export function GoalCard({ goal, contributions, currency }: GoalCardProps) {
           goal={goal}
           triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
           triggerAriaLabel={`Edit ${goal.name}`}
+          onOptimisticUpdate={onOptimisticUpdate}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path
@@ -96,7 +101,7 @@ export function GoalCard({ goal, contributions, currency }: GoalCardProps) {
             />
           </svg>
         </GoalFormDialog>
-        <DeleteGoalButton id={goal.id} name={goal.name} />
+        <DeleteGoalButton id={goal.id} name={goal.name} onOptimisticRemove={onOptimisticRemove} />
         <button
           type="button"
           onClick={() => setHistoryOpen((v) => !v)}

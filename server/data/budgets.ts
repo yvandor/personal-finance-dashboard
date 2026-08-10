@@ -4,6 +4,7 @@ import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema } from "@/lib/schemas/budget";
 import { monthKeyRange, currentMonthKey } from "@/lib/dates";
+import { computeBudgetProgress } from "@/lib/budgets";
 import { Prisma } from "@/app/generated/prisma/client";
 
 // This module is the ONLY place `prisma` is referenced for budgets. Every
@@ -91,13 +92,7 @@ export async function listBudgetsWithProgress(rawFilters: unknown = {}): Promise
 
   const items = budgets.map((b) => {
     const spentCents = spentByCategoryId.get(b.categoryId) ?? 0;
-    const remainingCents = b.amountCents - spentCents;
-    // Guarded the same way the dashboard's savings rate is: a zero budget
-    // with zero spend is 0%, not NaN; any spend against a zero budget caps
-    // the *display* percent at 100 rather than showing Infinity, while
-    // isOverBudget below is computed from the raw cents, unaffected by the cap.
-    const percentUsed =
-      b.amountCents > 0 ? Math.round((spentCents / b.amountCents) * 100) : spentCents > 0 ? 100 : 0;
+    const progress = computeBudgetProgress(b.amountCents, spentCents);
     return {
       id: b.id,
       categoryId: b.categoryId,
@@ -106,9 +101,7 @@ export async function listBudgetsWithProgress(rawFilters: unknown = {}): Promise
       amountCents: b.amountCents,
       notes: b.notes,
       spentCents,
-      remainingCents,
-      percentUsed,
-      isOverBudget: spentCents > b.amountCents,
+      ...progress,
     };
   });
 

@@ -1,5 +1,5 @@
 import { monthsBetween } from "@/lib/dates";
-import type { ContributionDTO } from "@/server/data/savingsGoals";
+import type { ContributionDTO, SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
 
 export interface GoalPace {
   /** 0 once the target month has been reached or passed -- never negative. */
@@ -49,6 +49,47 @@ export function computeGoalPace(params: {
   const onTrack = !isOverdue && averagePerMonthCents >= requiredPerMonthCents;
 
   return { monthsRemaining, requiredPerMonthCents, isOverdue, onTrack };
+}
+
+export interface GoalProgress {
+  remainingCents: number;
+  /** Rounded; NOT capped at 100, so a genuinely overfunded goal reads e.g. 140. */
+  percentComplete: number;
+}
+
+/**
+ * The progress math, extracted out of server/data/savingsGoals.ts so both
+ * the DAL and the client's optimistic-update draft builder
+ * (components/goals/ContributionForm.tsx) compute it identically.
+ */
+export function computeGoalProgress(targetCents: number, currentCents: number): GoalProgress {
+  const remainingCents = Math.max(targetCents - currentCents, 0);
+  const percentComplete = targetCents > 0 ? Math.round((currentCents / targetCents) * 100) : currentCents > 0 ? 100 : 0;
+  return { remainingCents, percentComplete };
+}
+
+export type GoalOptimisticAction =
+  | { type: "add"; goal: SavingsGoalProgressDTO }
+  | { type: "update"; id: string; patch: Partial<SavingsGoalProgressDTO> }
+  | { type: "remove"; id: string };
+
+/**
+ * Pure reducer for the useOptimistic overlay in
+ * components/goals/GoalsBoard.tsx -- same convention as
+ * lib/budgets.ts's budgetOptimisticReducer.
+ */
+export function goalOptimisticReducer(
+  state: SavingsGoalProgressDTO[],
+  action: GoalOptimisticAction,
+): SavingsGoalProgressDTO[] {
+  switch (action.type) {
+    case "add":
+      return [...state, action.goal];
+    case "update":
+      return state.map((g) => (g.id === action.id ? { ...g, ...action.patch } : g));
+    case "remove":
+      return state.filter((g) => g.id !== action.id);
+  }
 }
 
 // Pure, dependency-free grouping -- extracted out of

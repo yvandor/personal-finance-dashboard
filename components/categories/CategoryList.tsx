@@ -3,16 +3,25 @@ import type { CategoryManagementDTO } from "@/server/data/categories";
 
 interface CategoryListProps {
   categories: CategoryManagementDTO[];
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
 }
 
-function Section({ title, items }: { title: string; items: CategoryManagementDTO[] }) {
+function Section({
+  title,
+  items,
+  onOptimisticUpdate,
+}: {
+  title: string;
+  items: CategoryManagementDTO[];
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
+}) {
   if (items.length === 0) return null;
   return (
     <div>
       <h2 className="mb-2 text-sm font-semibold text-muted">{title}</h2>
       <div className="space-y-2">
         {items.map((c) => (
-          <CategoryRow key={c.id} category={c} />
+          <CategoryRow key={c.id} category={c} onOptimisticUpdate={onOptimisticUpdate} />
         ))}
       </div>
     </div>
@@ -23,7 +32,7 @@ function Section({ title, items }: { title: string; items: CategoryManagementDTO
 // how the transaction/budget forms already type-scope their pickers, and
 // keeps archived categories visually de-emphasized without hiding them
 // (they're still real history, just not offered for new entries).
-export function CategoryList({ categories }: CategoryListProps) {
+export function CategoryList({ categories, onOptimisticUpdate }: CategoryListProps) {
   const active = categories.filter((c) => !c.isArchived);
   const archived = categories.filter((c) => c.isArchived);
   const income = active.filter((c) => c.type === "INCOME");
@@ -40,9 +49,9 @@ export function CategoryList({ categories }: CategoryListProps) {
 
   return (
     <div className="space-y-6">
-      <Section title="Income categories" items={income} />
-      <Section title="Expense categories" items={expense} />
-      <Section title="Archived" items={archived} />
+      <Section title="Income categories" items={income} onOptimisticUpdate={onOptimisticUpdate} />
+      <Section title="Expense categories" items={expense} onOptimisticUpdate={onOptimisticUpdate} />
+      <Section title="Archived" items={archived} onOptimisticUpdate={onOptimisticUpdate} />
     </div>
   );
 }

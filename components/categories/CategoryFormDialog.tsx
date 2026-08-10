@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { CategoryForm } from "./CategoryForm";
-import type { CategoryDTO } from "@/server/data/categories";
+import type { CategoryDTO, CategoryManagementDTO } from "@/server/data/categories";
 
 interface CategoryFormDialogProps {
   mode: "create" | "edit";
@@ -11,6 +11,8 @@ interface CategoryFormDialogProps {
   children: ReactNode;
   triggerClassName?: string;
   triggerAriaLabel?: string;
+  onOptimisticAdd?: (category: CategoryManagementDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
 }
 
 // Same shape as BudgetFormDialog: owns its own trigger <button>, and
@@ -21,6 +23,8 @@ export function CategoryFormDialog({
   children,
   triggerClassName,
   triggerAriaLabel,
+  onOptimisticAdd,
+  onOptimisticUpdate,
 }: CategoryFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [formInstanceKey, setFormInstanceKey] = useState(0);
@@ -36,7 +40,14 @@ export function CategoryFormDialog({
         {children}
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title={mode === "create" ? "Add category" : "Edit category"}>
-        <CategoryForm key={formInstanceKey} mode={mode} category={category} onSuccess={() => setOpen(false)} />
+        <CategoryForm
+          key={formInstanceKey}
+          mode={mode}
+          category={category}
+          onSuccess={() => setOpen(false)}
+          onOptimisticAdd={onOptimisticAdd}
+          onOptimisticUpdate={onOptimisticUpdate}
+        />
       </Modal>
     </>
   );

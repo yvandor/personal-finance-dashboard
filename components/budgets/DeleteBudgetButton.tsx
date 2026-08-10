@@ -7,12 +7,14 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 interface DeleteBudgetButtonProps {
   id: string;
   categoryName: string;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticRemove?: (id: string) => void;
 }
 
 // Same shape as DeleteTransactionButton: not useActionState, since this
 // isn't a <form> and closing the dialog on success is an event-driven side
 // effect of the confirm click.
-export function DeleteBudgetButton({ id, categoryName }: DeleteBudgetButtonProps) {
+export function DeleteBudgetButton({ id, categoryName, onOptimisticRemove }: DeleteBudgetButtonProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -20,6 +22,11 @@ export function DeleteBudgetButton({ id, categoryName }: DeleteBudgetButtonProps
   function handleConfirm() {
     setError(null);
     startTransition(async () => {
+      // Dispatched inside this same transition, before the await -- the
+      // row disappears from the list immediately; useOptimistic reverts it
+      // automatically (the row reappears) once this transition settles, if
+      // the real delete below turns out to have failed.
+      onOptimisticRemove?.(id);
       const result = await deleteBudgetAction(id, null);
       if (result.ok) {
         setOpen(false);

@@ -3,13 +3,20 @@
 import { useActionState, useEffect, useId, useState } from "react";
 import { createSavingsGoalAction, updateSavingsGoalAction } from "@/server/actions/savingsGoals";
 import { Button } from "@/components/ui/Button";
-import type { SavingsGoalDTO } from "@/server/data/savingsGoals";
+import { computeGoalProgress, computeGoalPace } from "@/lib/savingsGoals";
+import { parseMoneyToCents } from "@/lib/money";
+import type { SavingsGoalDTO, SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
 import type { ActionResult } from "@/lib/result";
 
 interface GoalFormProps {
   mode: "create" | "edit";
-  goal?: SavingsGoalDTO;
+  /** SavingsGoalProgressDTO (not just SavingsGoalDTO) in edit mode so an
+   * optimistic target/date change can recompute correct progress/pace. */
+  goal?: SavingsGoalProgressDTO;
   onSuccess: () => void;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticAdd?: (goal: SavingsGoalProgressDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
 }
 
 type FormState = ActionResult<SavingsGoalDTO> | null;
@@ -18,10 +25,72 @@ const DEFAULT_COLOR = "#0ea5e9";
 
 // Controlled inputs from the start -- same reasoning as BudgetForm.tsx: a
 // failed submission must never discard what was typed.
-export function GoalForm({ mode, goal, onSuccess }: GoalFormProps) {
+export function GoalForm({ mode, goal, onSuccess, onOptimisticAdd, onOptimisticUpdate }: GoalFormProps) {
   const boundAction = mode === "edit" && goal ? updateSavingsGoalAction.bind(null, goal.id) : createSavingsGoalAction;
 
-  const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, null);
+  // Wraps the real bound action so the optimistic dispatch happens inside
+  // the same transition useActionState already runs its action in --
+  // useOptimistic requires that.
+  async function action(prevState: FormState, formData: FormData): Promise<FormState> {
+    let targetCents = 0;
+    try {
+      targetCents = parseMoneyToCents(String(formData.get("target") ?? ""));
+    } catch {
+      // fall through to the real action, which produces the field error
+    }
+    const name = String(formData.get("name") ?? "");
+    const description = (formData.get("description") as string) || null;
+    const targetDateRaw = formData.get("targetDate");
+    const targetDate = targetDateRaw === "" ? null : ((targetDateRaw as string) ?? null);
+    const color = String(formData.get("color") ?? DEFAULT_COLOR);
+
+    if (mode === "create" && onOptimisticAdd) {
+      const { remainingCents, percentComplete } = computeGoalProgress(targetCents, 0);
+      const nowIso = new Date().toISOString();
+      onOptimisticAdd({
+        id: `optimistic-${Date.now()}`,
+        name,
+        description,
+        targetCents,
+        startingCents: 0,
+        targetDate,
+        status: "ACTIVE",
+        color,
+        achievedAt: null,
+        createdAt: nowIso,
+        currentCents: 0,
+        remainingCents,
+        percentComplete,
+        isAchieved: false,
+        pace:
+          targetDate != null
+            ? computeGoalPace({
+                targetDate: new Date(`${targetDate}T00:00:00Z`),
+                createdAt: new Date(nowIso),
+                startingCents: 0,
+                currentCents: 0,
+                remainingCents,
+              })
+            : null,
+      });
+    } else if (mode === "edit" && goal && onOptimisticUpdate) {
+      const { remainingCents, percentComplete } = computeGoalProgress(targetCents, goal.currentCents);
+      const pace =
+        !goal.isAchieved && targetDate != null
+          ? computeGoalPace({
+              targetDate: new Date(`${targetDate}T00:00:00Z`),
+              createdAt: new Date(goal.createdAt),
+              startingCents: goal.startingCents,
+              currentCents: goal.currentCents,
+              remainingCents,
+            })
+          : null;
+      onOptimisticUpdate(goal.id, { name, description, targetCents, targetDate, color, remainingCents, percentComplete, pace });
+    }
+    return boundAction(prevState, formData);
+  }
+
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, null);
 
   const [name, setName] = useState(goal?.name ?? "");
   const [description, setDescription] = useState(goal?.description ?? "");

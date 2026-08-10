@@ -7,13 +7,15 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 interface DeleteGoalButtonProps {
   id: string;
   name: string;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticRemove?: (id: string) => void;
 }
 
 // Same shape as DeleteBudgetButton. Unlike category archiving, deleting a
 // goal is a real delete -- see server/data/savingsGoals.ts's comment on why
 // that's safe here (a goal's contributions are their own self-contained
 // ledger, never touching transactions).
-export function DeleteGoalButton({ id, name }: DeleteGoalButtonProps) {
+export function DeleteGoalButton({ id, name, onOptimisticRemove }: DeleteGoalButtonProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -21,6 +23,7 @@ export function DeleteGoalButton({ id, name }: DeleteGoalButtonProps) {
   function handleConfirm() {
     setError(null);
     startTransition(async () => {
+      onOptimisticRemove?.(id);
       const result = await deleteSavingsGoalAction(id, null);
       if (result.ok) {
         setOpen(false);

@@ -97,6 +97,11 @@ describe("GoalForm", () => {
       color: "#0ea5e9",
       achievedAt: null,
       createdAt: "2026-01-01T00:00:00.000Z",
+      currentCents: 100000,
+      remainingCents: 400000,
+      percentComplete: 20,
+      isAchieved: false,
+      pace: null,
     };
     render(<GoalForm mode="edit" goal={goal} onSuccess={vi.fn()} />);
 

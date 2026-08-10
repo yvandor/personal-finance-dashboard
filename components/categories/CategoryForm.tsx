@@ -3,13 +3,16 @@
 import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createCategoryAction, updateCategoryAction } from "@/server/actions/categories";
 import { Button } from "@/components/ui/Button";
-import type { CategoryDTO } from "@/server/data/categories";
+import type { CategoryDTO, CategoryManagementDTO } from "@/server/data/categories";
 import type { ActionResult } from "@/lib/result";
 
 interface CategoryFormProps {
   mode: "create" | "edit";
   category?: CategoryDTO;
   onSuccess: () => void;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticAdd?: (category: CategoryManagementDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
 }
 
 type FormState = ActionResult<CategoryDTO> | null;
@@ -19,11 +22,35 @@ const DEFAULT_COLOR = "#64748b";
 // Controlled inputs from the start -- same reasoning as BudgetForm.tsx: a
 // failed submission must never discard what was typed, and many instances
 // of this form's edit dialog can be mounted at once (one per row).
-export function CategoryForm({ mode, category, onSuccess }: CategoryFormProps) {
+export function CategoryForm({ mode, category, onSuccess, onOptimisticAdd, onOptimisticUpdate }: CategoryFormProps) {
   const boundAction =
     mode === "edit" && category ? updateCategoryAction.bind(null, category.id) : createCategoryAction;
 
-  const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, null);
+  // Wraps the real bound action so the optimistic dispatch happens inside
+  // the same transition useActionState already runs its action in --
+  // useOptimistic requires that. transactionCount defaults to 0 for a
+  // brand-new category -- always exactly correct, since it can't have any
+  // transactions filed under it yet.
+  async function action(prevState: FormState, formData: FormData): Promise<FormState> {
+    const name = String(formData.get("name") ?? "");
+    const color = String(formData.get("color") ?? DEFAULT_COLOR);
+    if (mode === "create" && onOptimisticAdd) {
+      onOptimisticAdd({
+        id: `optimistic-${Date.now()}`,
+        name,
+        type: (formData.get("type") as "INCOME" | "EXPENSE") ?? "EXPENSE",
+        color,
+        isArchived: false,
+        isSystem: false,
+        transactionCount: 0,
+      });
+    } else if (mode === "edit" && category && onOptimisticUpdate) {
+      onOptimisticUpdate(category.id, { name, color });
+    }
+    return boundAction(prevState, formData);
+  }
+
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, null);
 
   const [name, setName] = useState(category?.name ?? "");
   const [type, setType] = useState<"INCOME" | "EXPENSE">(category?.type ?? "EXPENSE");

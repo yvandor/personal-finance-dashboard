@@ -9,9 +9,18 @@ interface TransactionCardProps {
   categoryName: string;
   categories: CategoryDTO[];
   currency?: string;
+  onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
-export function TransactionCard({ transaction, categoryName, categories, currency }: TransactionCardProps) {
+export function TransactionCard({
+  transaction,
+  categoryName,
+  categories,
+  currency,
+  onOptimisticUpdate,
+  onOptimisticRemove,
+}: TransactionCardProps) {
   const signedCents = transaction.type === "EXPENSE" ? -transaction.amountCents : transaction.amountCents;
 
   return (
@@ -31,10 +40,15 @@ export function TransactionCard({ transaction, categoryName, categories, currenc
           transaction={transaction}
           categories={categories}
           triggerClassName="rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface-hover"
+          onOptimisticUpdate={onOptimisticUpdate}
         >
           Edit
         </TransactionFormDialog>
-        <DeleteTransactionButton id={transaction.id} description={transaction.description} />
+        <DeleteTransactionButton
+          id={transaction.id}
+          description={transaction.description}
+          onOptimisticRemove={onOptimisticRemove}
+        />
       </div>
     </div>
   );

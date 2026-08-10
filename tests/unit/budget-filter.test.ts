@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAvailableBudgetCategories } from "@/lib/budgets";
+import { filterAvailableBudgetCategories, computeBudgetProgress } from "@/lib/budgets";
 import type { CategoryDTO } from "@/server/data/categories";
 
 const categories: CategoryDTO[] = [
@@ -34,5 +34,28 @@ describe("filterAvailableBudgetCategories", () => {
     // what's in budgetedCategoryIds -- the type check comes first.
     const result = filterAvailableBudgetCategories(categories, new Set());
     expect(result.some((c) => c.type === "INCOME")).toBe(false);
+  });
+});
+
+describe("computeBudgetProgress", () => {
+  it("computes remaining and percent used under budget", () => {
+    expect(computeBudgetProgress(10000, 3000)).toEqual({
+      remainingCents: 7000,
+      percentUsed: 30,
+      isOverBudget: false,
+    });
+  });
+
+  it("computes an over-budget state with a percent above 100", () => {
+    expect(computeBudgetProgress(10000, 14000)).toEqual({
+      remainingCents: -4000,
+      percentUsed: 140,
+      isOverBudget: true,
+    });
+  });
+
+  it("guards a zero-amount budget against divide-by-zero", () => {
+    expect(computeBudgetProgress(0, 0)).toEqual({ remainingCents: 0, percentUsed: 0, isOverBudget: false });
+    expect(computeBudgetProgress(0, 500)).toEqual({ remainingCents: -500, percentUsed: 100, isOverBudget: true });
   });
 });

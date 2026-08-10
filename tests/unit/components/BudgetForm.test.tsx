@@ -99,6 +99,10 @@ describe("BudgetForm", () => {
       month: "2026-03",
       amountCents: 30000,
       notes: null,
+      spentCents: 10000,
+      remainingCents: 20000,
+      percentUsed: 33,
+      isOverBudget: false,
     };
     render(<BudgetForm mode="edit" budget={budget} month="2026-03" onSuccess={vi.fn()} />);
 

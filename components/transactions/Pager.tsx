@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-interface PagerProps {
+export interface PagerProps {
   itemsCount: number;
   total: number;
   hasNext: boolean;

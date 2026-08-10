@@ -2,11 +2,7 @@ import { listTransactions, getTransactionsSummary } from "@/server/data/transact
 import { listCategories } from "@/server/data/categories";
 import { getCurrentUserCurrency } from "@/server/data/users";
 import { transactionFilterSchema } from "@/lib/schemas/transaction";
-import { SummaryCards } from "@/components/transactions/SummaryCards";
-import { TransactionFilters } from "@/components/transactions/TransactionFilters";
-import { TransactionList } from "@/components/transactions/TransactionList";
-import { TransactionFormDialog } from "@/components/transactions/TransactionFormDialog";
-import { Pager } from "@/components/transactions/Pager";
+import { TransactionsBoard } from "@/components/transactions/TransactionsBoard";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -14,12 +10,11 @@ function toSingle(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const PRIMARY_BUTTON_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
-
 // A Server Component: reads searchParams, calls the DAL directly (no
-// Server Action needed for a read), and composes presentational
-// components. Writes go through server/actions/transactions.ts instead.
+// Server Action needed for a read), and hands the results to
+// TransactionsBoard (a client component), which owns the useOptimistic
+// overlay shared by the header's create dialog and the list below it.
+// Writes go through server/actions/transactions.ts.
 export default async function TransactionsPage({
   searchParams,
 }: {
@@ -46,6 +41,12 @@ export default async function TransactionsPage({
   const hasActiveFilters = Boolean(
     filters.type || filters.categoryId || filters.dateFrom || filters.dateTo || filters.q,
   );
+  // An optimistic insert only ever makes sense on the unfiltered first
+  // page -- the same real ordering listTransactions itself would return a
+  // new transaction into (see lib/transactions.ts's comment). Any filter
+  // or a cursor means the currently-displayed rows are a narrower or
+  // shifted window that a client-side insert can't reliably place into.
+  const isDefaultView = !hasActiveFilters && !filters.cursor;
 
   const [categories, currency, { items, total, hasNext, hasPrev, nextCursor, prevCursor }, summary] =
     await Promise.all([
@@ -57,37 +58,22 @@ export default async function TransactionsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
-          <p className="text-sm text-muted">Add, edit, and review your income and expenses.</p>
-        </div>
-        <TransactionFormDialog mode="create" categories={categories} triggerClassName={PRIMARY_BUTTON_CLASSES}>
-          Add transaction
-        </TransactionFormDialog>
-      </div>
-
-      <SummaryCards summary={summary} currency={currency} />
-
-      <TransactionFilters categories={categories} />
-
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <TransactionList
-          transactions={items}
-          categories={categories}
-          currency={currency}
-          hasActiveFilters={hasActiveFilters}
-        />
-        <Pager
-          itemsCount={items.length}
-          total={total}
-          hasNext={hasNext}
-          hasPrev={hasPrev}
-          nextCursor={nextCursor}
-          prevCursor={prevCursor}
-          searchParams={Object.fromEntries(Object.entries(rawParams).map(([k, v]) => [k, toSingle(v)]))}
-        />
-      </div>
+      <TransactionsBoard
+        transactions={items}
+        categories={categories}
+        currency={currency}
+        hasActiveFilters={hasActiveFilters}
+        summary={summary}
+        isDefaultView={isDefaultView}
+        pager={{
+          total,
+          hasNext,
+          hasPrev,
+          nextCursor,
+          prevCursor,
+          searchParams: Object.fromEntries(Object.entries(rawParams).map(([k, v]) => [k, toSingle(v)])),
+        }}
+      />
     </div>
   );
 }

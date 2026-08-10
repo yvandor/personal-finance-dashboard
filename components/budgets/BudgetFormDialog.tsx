@@ -3,18 +3,20 @@
 import { useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { BudgetForm } from "./BudgetForm";
-import type { BudgetDTO } from "@/server/data/budgets";
+import type { BudgetProgressDTO } from "@/server/data/budgets";
 import type { CategoryDTO } from "@/server/data/categories";
 
 interface BudgetFormDialogProps {
   mode: "create" | "edit";
-  budget?: BudgetDTO;
+  budget?: BudgetProgressDTO;
   categories?: CategoryDTO[];
   month: string;
   /** Rendered as the trigger button's content (text or an icon), not cloned. */
   children: ReactNode;
   triggerClassName?: string;
   triggerAriaLabel?: string;
+  onOptimisticAdd?: (budget: BudgetProgressDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<BudgetProgressDTO>) => void;
 }
 
 // Same shape as TransactionFormDialog: owns its own trigger <button> (never
@@ -30,6 +32,8 @@ export function BudgetFormDialog({
   children,
   triggerClassName,
   triggerAriaLabel,
+  onOptimisticAdd,
+  onOptimisticUpdate,
 }: BudgetFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [formInstanceKey, setFormInstanceKey] = useState(0);
@@ -52,6 +56,8 @@ export function BudgetFormDialog({
           categories={categories}
           month={month}
           onSuccess={() => setOpen(false)}
+          onOptimisticAdd={onOptimisticAdd}
+          onOptimisticUpdate={onOptimisticUpdate}
         />
       </Modal>
     </>

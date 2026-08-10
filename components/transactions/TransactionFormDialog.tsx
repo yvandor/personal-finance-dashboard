@@ -14,6 +14,8 @@ interface TransactionFormDialogProps {
   children: ReactNode;
   triggerClassName?: string;
   triggerAriaLabel?: string;
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
 }
 
 export function TransactionFormDialog({
@@ -23,6 +25,8 @@ export function TransactionFormDialog({
   children,
   triggerClassName,
   triggerAriaLabel,
+  onOptimisticAdd,
+  onOptimisticUpdate,
 }: TransactionFormDialogProps) {
   const [open, setOpen] = useState(false);
 
@@ -53,6 +57,8 @@ export function TransactionFormDialog({
           transaction={transaction}
           categories={categories}
           onSuccess={() => setOpen(false)}
+          onOptimisticAdd={onOptimisticAdd}
+          onOptimisticUpdate={onOptimisticUpdate}
         />
       </Modal>
     </>

@@ -7,9 +7,11 @@ import type { BudgetProgressDTO } from "@/server/data/budgets";
 interface BudgetCardProps {
   budget: BudgetProgressDTO;
   currency?: string;
+  onOptimisticUpdate?: (id: string, patch: Partial<BudgetProgressDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
-export function BudgetCard({ budget, currency }: BudgetCardProps) {
+export function BudgetCard({ budget, currency, onOptimisticUpdate, onOptimisticRemove }: BudgetCardProps) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
@@ -27,6 +29,7 @@ export function BudgetCard({ budget, currency }: BudgetCardProps) {
             month={budget.month}
             triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit budget for ${budget.categoryName}`}
+            onOptimisticUpdate={onOptimisticUpdate}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path
@@ -36,7 +39,11 @@ export function BudgetCard({ budget, currency }: BudgetCardProps) {
               />
             </svg>
           </BudgetFormDialog>
-          <DeleteBudgetButton id={budget.id} categoryName={budget.categoryName} />
+          <DeleteBudgetButton
+            id={budget.id}
+            categoryName={budget.categoryName}
+            onOptimisticRemove={onOptimisticRemove}
+          />
         </div>
       </div>
 

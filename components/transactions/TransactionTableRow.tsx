@@ -9,9 +9,18 @@ interface TransactionTableRowProps {
   categoryName: string;
   categories: CategoryDTO[];
   currency?: string;
+  onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
-export function TransactionTableRow({ transaction, categoryName, categories, currency }: TransactionTableRowProps) {
+export function TransactionTableRow({
+  transaction,
+  categoryName,
+  categories,
+  currency,
+  onOptimisticUpdate,
+  onOptimisticRemove,
+}: TransactionTableRowProps) {
   const signedCents = transaction.type === "EXPENSE" ? -transaction.amountCents : transaction.amountCents;
 
   return (
@@ -31,6 +40,7 @@ export function TransactionTableRow({ transaction, categoryName, categories, cur
             categories={categories}
             triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit ${transaction.description}`}
+            onOptimisticUpdate={onOptimisticUpdate}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path
@@ -40,7 +50,12 @@ export function TransactionTableRow({ transaction, categoryName, categories, cur
               />
             </svg>
           </TransactionFormDialog>
-          <DeleteTransactionButton id={transaction.id} description={transaction.description} compact />
+          <DeleteTransactionButton
+            id={transaction.id}
+            description={transaction.description}
+            compact
+            onOptimisticRemove={onOptimisticRemove}
+          />
         </div>
       </td>
     </tr>

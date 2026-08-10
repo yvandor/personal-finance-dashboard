@@ -8,12 +8,21 @@ interface TransactionListProps {
   categories: CategoryDTO[];
   currency?: string;
   hasActiveFilters: boolean;
+  onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
 // Renders both the desktop table and the mobile card list, one CSS-hidden
 // via Tailwind breakpoints -- no client JS, no duplicate data fetch, just
 // slightly more server-rendered HTML than a single shared tree would send.
-export function TransactionList({ transactions, categories, currency, hasActiveFilters }: TransactionListProps) {
+export function TransactionList({
+  transactions,
+  categories,
+  currency,
+  hasActiveFilters,
+  onOptimisticUpdate,
+  onOptimisticRemove,
+}: TransactionListProps) {
   const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
 
   if (transactions.length === 0) {
@@ -64,6 +73,8 @@ export function TransactionList({ transactions, categories, currency, hasActiveF
               categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
               categories={categories}
               currency={currency}
+              onOptimisticUpdate={onOptimisticUpdate}
+              onOptimisticRemove={onOptimisticRemove}
             />
           ))}
         </tbody>
@@ -77,6 +88,8 @@ export function TransactionList({ transactions, categories, currency, hasActiveF
             categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
             categories={categories}
             currency={currency}
+            onOptimisticUpdate={onOptimisticUpdate}
+            onOptimisticRemove={onOptimisticRemove}
           />
         ))}
       </div>

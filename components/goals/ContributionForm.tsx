@@ -3,12 +3,18 @@
 import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { contributeToGoalAction } from "@/server/actions/savingsGoals";
 import { Button } from "@/components/ui/Button";
+import { computeGoalProgress, computeGoalPace } from "@/lib/savingsGoals";
+import { parseMoneyToCents } from "@/lib/money";
 import type { SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
 import type { ActionResult } from "@/lib/result";
 
 interface ContributionFormProps {
   goalId: string;
   onSuccess: () => void;
+  /** Only needed to compute an optimistic patch; optional so every existing
+   * render/test call site keeps working unchanged. */
+  goal?: SavingsGoalProgressDTO;
+  onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
 }
 
 type FormState = ActionResult<SavingsGoalProgressDTO> | null;
@@ -25,9 +31,52 @@ const QUICK_AMOUNTS = ["25", "50", "100", "250"];
 // fix CategoryForm.tsx's type radios needed -- verified empirically to
 // affect a controlled radio group the same way TransactionForm/BudgetForm's
 // <select> comment documents.
-export function ContributionForm({ goalId, onSuccess }: ContributionFormProps) {
+export function ContributionForm({ goalId, onSuccess, goal, onOptimisticUpdate }: ContributionFormProps) {
   const boundAction = contributeToGoalAction.bind(null, goalId);
-  const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, null);
+
+  // Wraps the real bound action so the optimistic dispatch happens inside
+  // the same transition useActionState already runs its action in --
+  // useOptimistic requires that. Reuses the exact same pure math the DAL
+  // uses (computeGoalProgress/computeGoalPace) and mirrors its one-way
+  // achievement transition (see server/data/savingsGoals.ts's
+  // contributeToGoal), so the optimistic result is the real result, not an
+  // approximation -- everything needed (currentCents, startingCents,
+  // createdAt) is already known client-side from the goal prop.
+  async function action(prevState: FormState, formData: FormData): Promise<FormState> {
+    if (goal && onOptimisticUpdate) {
+      try {
+        const magnitude = parseMoneyToCents(String(formData.get("amount") ?? ""));
+        const signed = formData.get("direction") === "WITHDRAWAL" ? -magnitude : magnitude;
+        const newCurrentCents = goal.currentCents + signed;
+        const { remainingCents, percentComplete } = computeGoalProgress(goal.targetCents, newCurrentCents);
+        const isAchieved = goal.isAchieved || newCurrentCents >= goal.targetCents;
+        const pace =
+          !isAchieved && goal.targetDate
+            ? computeGoalPace({
+                targetDate: new Date(`${goal.targetDate}T00:00:00Z`),
+                createdAt: new Date(goal.createdAt),
+                startingCents: goal.startingCents,
+                currentCents: newCurrentCents,
+                remainingCents,
+              })
+            : null;
+        onOptimisticUpdate(goal.id, {
+          currentCents: newCurrentCents,
+          remainingCents,
+          percentComplete,
+          isAchieved,
+          status: isAchieved ? "ACHIEVED" : goal.status,
+          pace,
+        });
+      } catch {
+        // An unparseable amount: skip the optimistic update and let the
+        // real action below produce the field error.
+      }
+    }
+    return boundAction(prevState, formData);
+  }
+
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, null);
 
   const [direction, setDirection] = useState<"CONTRIBUTION" | "WITHDRAWAL">("CONTRIBUTION");
   const [amount, setAmount] = useState("");

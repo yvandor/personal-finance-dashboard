@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createTransactionAction, updateTransactionAction } from "@/server/actions/transactions";
 import { Button } from "@/components/ui/Button";
+import { parseMoneyToCents } from "@/lib/money";
 import type { TransactionDTO } from "@/server/data/transactions";
 import type { CategoryDTO } from "@/server/data/categories";
 import type { ActionResult } from "@/lib/result";
@@ -12,6 +13,15 @@ interface TransactionFormProps {
   transaction?: TransactionDTO;
   categories: CategoryDTO[];
   onSuccess: () => void;
+  /**
+   * Optional so every existing render/test call site keeps working
+   * unchanged. Only passed by TransactionsBoard.tsx when the page is
+   * showing the default (unfiltered, first-page) view -- see
+   * lib/transactions.ts's comment on why an optimistic insert is skipped
+   * everywhere else.
+   */
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
 }
 
 type FormState = ActionResult<TransactionDTO> | null;
@@ -24,13 +34,55 @@ type FormState = ActionResult<TransactionDTO> | null;
 // user most needs to see and fix it. Controlled inputs are immune to that
 // reset because their displayed value always comes from React state, never
 // from the DOM.
-export function TransactionForm({ mode, transaction, categories, onSuccess }: TransactionFormProps) {
+export function TransactionForm({
+  mode,
+  transaction,
+  categories,
+  onSuccess,
+  onOptimisticAdd,
+  onOptimisticUpdate,
+}: TransactionFormProps) {
   const boundAction =
     mode === "edit" && transaction
       ? updateTransactionAction.bind(null, transaction.id)
       : createTransactionAction;
 
-  const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, null);
+  // Wraps the real bound action so the optimistic dispatch happens inside
+  // the same transition useActionState already runs its action in --
+  // useOptimistic requires that. No derived fields to recompute here
+  // (TransactionDTO is plain stored data, unlike Budget/Goal's server-
+  // computed progress), so the draft is a direct merge of the form values.
+  async function action(prevState: FormState, formData: FormData): Promise<FormState> {
+    let amountCents = 0;
+    try {
+      amountCents = parseMoneyToCents(String(formData.get("amount") ?? ""));
+    } catch {
+      // fall through to the real action, which produces the field error
+    }
+    const draft = {
+      type: formData.get("type") as "EXPENSE" | "INCOME",
+      amountCents,
+      date: String(formData.get("date") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      notes: (formData.get("notes") as string) || null,
+      categoryId: String(formData.get("categoryId") ?? ""),
+    };
+    if (mode === "create" && onOptimisticAdd) {
+      const now = new Date().toISOString();
+      onOptimisticAdd({
+        id: `optimistic-${Date.now()}`,
+        userId: "",
+        ...draft,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (mode === "edit" && transaction && onOptimisticUpdate) {
+      onOptimisticUpdate(transaction.id, draft);
+    }
+    return boundAction(prevState, formData);
+  }
+
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, null);
 
   const [type, setType] = useState<"EXPENSE" | "INCOME">(transaction?.type ?? "EXPENSE");
   const [amount, setAmount] = useState(transaction ? (transaction.amountCents / 100).toFixed(2) : "");

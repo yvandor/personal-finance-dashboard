@@ -4,9 +4,10 @@ import type { CategoryManagementDTO } from "@/server/data/categories";
 
 interface CategoryRowProps {
   category: CategoryManagementDTO;
+  onOptimisticUpdate?: (id: string, patch: Partial<CategoryManagementDTO>) => void;
 }
 
-export function CategoryRow({ category }: CategoryRowProps) {
+export function CategoryRow({ category, onOptimisticUpdate }: CategoryRowProps) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -34,6 +35,7 @@ export function CategoryRow({ category }: CategoryRowProps) {
             category={category}
             triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit ${category.name}`}
+            onOptimisticUpdate={onOptimisticUpdate}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path
@@ -49,6 +51,7 @@ export function CategoryRow({ category }: CategoryRowProps) {
           name={category.name}
           isArchived={category.isArchived}
           transactionCount={category.transactionCount}
+          onOptimisticUpdate={onOptimisticUpdate}
         />
       </div>
     </div>

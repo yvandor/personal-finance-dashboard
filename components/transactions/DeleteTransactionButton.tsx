@@ -9,12 +9,19 @@ interface DeleteTransactionButtonProps {
   description: string;
   /** Compact icon-only trigger for table rows vs. a labeled button for mobile cards. */
   compact?: boolean;
+  /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticRemove?: (id: string) => void;
 }
 
 // Deliberately not useActionState here: this isn't a <form>, and closing
 // the dialog on success is an event-driven side effect of the confirm
 // click, not something to derive via a useEffect watching action state.
-export function DeleteTransactionButton({ id, description, compact = false }: DeleteTransactionButtonProps) {
+export function DeleteTransactionButton({
+  id,
+  description,
+  compact = false,
+  onOptimisticRemove,
+}: DeleteTransactionButtonProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -22,6 +29,7 @@ export function DeleteTransactionButton({ id, description, compact = false }: De
   function handleConfirm() {
     setError(null);
     startTransition(async () => {
+      onOptimisticRemove?.(id);
       const result = await deleteTransactionAction(id, null);
       if (result.ok) {
         setOpen(false);

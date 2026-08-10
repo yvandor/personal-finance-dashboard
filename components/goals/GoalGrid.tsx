@@ -8,12 +8,14 @@ interface GoalGridProps {
   goals: SavingsGoalProgressDTO[];
   contributionsByGoal: Map<string, ContributionDTO[]>;
   currency?: string;
+  onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
+  onOptimisticRemove?: (id: string) => void;
 }
 
 // Achieved goals move into a collapsed section rather than staying mixed in
 // with active ones -- docs/PROJECT_PLAN.md's Savings Goals AC: "completed
 // goals move to a collapsed/archived section."
-export function GoalGrid({ goals, contributionsByGoal, currency }: GoalGridProps) {
+export function GoalGrid({ goals, contributionsByGoal, currency, onOptimisticUpdate, onOptimisticRemove }: GoalGridProps) {
   const [completedOpen, setCompletedOpen] = useState(false);
 
   if (goals.length === 0) {
@@ -38,6 +40,8 @@ export function GoalGrid({ goals, contributionsByGoal, currency }: GoalGridProps
               goal={goal}
               contributions={contributionsByGoal.get(goal.id) ?? []}
               currency={currency}
+              onOptimisticUpdate={onOptimisticUpdate}
+              onOptimisticRemove={onOptimisticRemove}
             />
           ))}
         </div>

@@ -7,7 +7,7 @@ import {
   savingsGoalUpdateSchema,
   savingsContributionCreateSchema,
 } from "@/lib/schemas/savingsGoal";
-import { computeGoalPace, type GoalPace } from "@/lib/savingsGoals";
+import { computeGoalPace, computeGoalProgress, type GoalPace } from "@/lib/savingsGoals";
 import type { GoalStatus } from "@/app/generated/prisma/enums";
 import type { SavingsGoal, SavingsContribution } from "@/app/generated/prisma/client";
 import { Prisma } from "@/app/generated/prisma/client";
@@ -75,9 +75,7 @@ function toDTO(row: SavingsGoal): SavingsGoalDTO {
 }
 
 function toProgressDTO(row: SavingsGoal, currentCents: number, now: Date): SavingsGoalProgressDTO {
-  const remainingCents = Math.max(row.targetCents - currentCents, 0);
-  const percentComplete =
-    row.targetCents > 0 ? Math.round((currentCents / row.targetCents) * 100) : currentCents > 0 ? 100 : 0;
+  const { remainingCents, percentComplete } = computeGoalProgress(row.targetCents, currentCents);
   const isAchieved = row.status === "ACHIEVED";
 
   const pace =

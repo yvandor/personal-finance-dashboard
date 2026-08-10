@@ -3,19 +3,29 @@
 import { useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { GoalForm } from "./GoalForm";
-import type { SavingsGoalDTO } from "@/server/data/savingsGoals";
+import type { SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
 
 interface GoalFormDialogProps {
   mode: "create" | "edit";
-  goal?: SavingsGoalDTO;
+  goal?: SavingsGoalProgressDTO;
   children: ReactNode;
   triggerClassName?: string;
   triggerAriaLabel?: string;
+  onOptimisticAdd?: (goal: SavingsGoalProgressDTO) => void;
+  onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
 }
 
 // Same shape as BudgetFormDialog: owns its own trigger <button>, and
 // remounts GoalForm with a fresh key only when freshly opened.
-export function GoalFormDialog({ mode, goal, children, triggerClassName, triggerAriaLabel }: GoalFormDialogProps) {
+export function GoalFormDialog({
+  mode,
+  goal,
+  children,
+  triggerClassName,
+  triggerAriaLabel,
+  onOptimisticAdd,
+  onOptimisticUpdate,
+}: GoalFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [formInstanceKey, setFormInstanceKey] = useState(0);
 
@@ -30,7 +40,14 @@ export function GoalFormDialog({ mode, goal, children, triggerClassName, trigger
         {children}
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title={mode === "create" ? "Add goal" : "Edit goal"}>
-        <GoalForm key={formInstanceKey} mode={mode} goal={goal} onSuccess={() => setOpen(false)} />
+        <GoalForm
+          key={formInstanceKey}
+          mode={mode}
+          goal={goal}
+          onSuccess={() => setOpen(false)}
+          onOptimisticAdd={onOptimisticAdd}
+          onOptimisticUpdate={onOptimisticUpdate}
+        />
       </Modal>
     </>
   );

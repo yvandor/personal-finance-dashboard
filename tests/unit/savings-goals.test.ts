@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeGoalPace, groupContributionsByGoal } from "@/lib/savingsGoals";
-import type { ContributionDTO } from "@/server/data/savingsGoals";
+import { computeGoalPace, computeGoalProgress, groupContributionsByGoal, goalOptimisticReducer } from "@/lib/savingsGoals";
+import type { ContributionDTO, SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
 
 const NOW = new Date("2026-03-15T12:00:00Z");
 const CREATED_JAN_1 = new Date("2026-01-01T00:00:00Z");
@@ -104,6 +104,21 @@ describe("computeGoalPace", () => {
   });
 });
 
+describe("computeGoalProgress", () => {
+  it("computes remaining and percent complete under target", () => {
+    expect(computeGoalProgress(100000, 30000)).toEqual({ remainingCents: 70000, percentComplete: 30 });
+  });
+
+  it("clamps remainingCents at 0 for an overfunded goal, without capping percentComplete", () => {
+    expect(computeGoalProgress(100000, 140000)).toEqual({ remainingCents: 0, percentComplete: 140 });
+  });
+
+  it("guards a zero-target goal against divide-by-zero", () => {
+    expect(computeGoalProgress(0, 0)).toEqual({ remainingCents: 0, percentComplete: 0 });
+    expect(computeGoalProgress(0, 500)).toEqual({ remainingCents: 0, percentComplete: 100 });
+  });
+});
+
 describe("groupContributionsByGoal", () => {
   function makeContribution(overrides: Partial<ContributionDTO> = {}): ContributionDTO {
     return {
@@ -134,5 +149,46 @@ describe("groupContributionsByGoal", () => {
   it("returns undefined for a goal with no contributions (caller defaults to an empty array)", () => {
     const grouped = groupContributionsByGoal([makeContribution({ goalId: "g1" })]);
     expect(grouped.get("g2")).toBeUndefined();
+  });
+});
+
+function makeGoal(overrides: Partial<SavingsGoalProgressDTO> = {}): SavingsGoalProgressDTO {
+  return {
+    id: "g1",
+    name: "Trip",
+    description: null,
+    targetCents: 100000,
+    startingCents: 0,
+    targetDate: null,
+    status: "ACTIVE",
+    color: "#0ea5e9",
+    achievedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    currentCents: 0,
+    remainingCents: 100000,
+    percentComplete: 0,
+    isAchieved: false,
+    pace: null,
+    ...overrides,
+  };
+}
+
+describe("goalOptimisticReducer", () => {
+  it("appends a new goal on add", () => {
+    const result = goalOptimisticReducer([], { type: "add", goal: makeGoal() });
+    expect(result).toEqual([makeGoal()]);
+  });
+
+  it("merges a patch into the matching goal on update, leaving others untouched", () => {
+    const state = [makeGoal({ id: "g1" }), makeGoal({ id: "g2", name: "Other" })];
+    const result = goalOptimisticReducer(state, { type: "update", id: "g1", patch: { currentCents: 5000 } });
+    expect(result.find((g) => g.id === "g1")?.currentCents).toBe(5000);
+    expect(result.find((g) => g.id === "g2")?.name).toBe("Other");
+  });
+
+  it("removes the matching goal on remove, leaving others untouched", () => {
+    const state = [makeGoal({ id: "g1" }), makeGoal({ id: "g2" })];
+    const result = goalOptimisticReducer(state, { type: "remove", id: "g1" });
+    expect(result.map((g) => g.id)).toEqual(["g2"]);
   });
 });
