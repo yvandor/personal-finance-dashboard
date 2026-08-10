@@ -27,6 +27,10 @@ export async function resetTestData(): Promise<void> {
   // the goal that owns them.
   await prisma.savingsContribution.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.savingsGoal.deleteMany({ where: { userId: { in: userIds } } });
+  // Same explicit-not-cascade discipline for recurring bills: payments
+  // before the bill that owns them (see tests/integration/recurring-bills.test.ts).
+  await prisma.recurringBillPayment.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.recurringBill.deleteMany({ where: { userId: { in: userIds } } });
 
   // `update` is non-empty and resets every mutable field a test might have
   // touched (e.g. currency) -- an empty `update: {}` would only apply on

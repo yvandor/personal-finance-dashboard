@@ -46,6 +46,10 @@ const FIXTURE_CATEGORIES: { name: string; type: CategoryType }[] = [
 ];
 
 async function main() {
+  // Explicit, not relied-upon-via-cascade -- same discipline as tests/setup.ts:
+  // payments before the bills they reference.
+  await prisma.recurringBillPayment.deleteMany({ where: { userId: DEV_USER_ID } });
+  await prisma.recurringBill.deleteMany({ where: { userId: DEV_USER_ID } });
   await prisma.budget.deleteMany({ where: { userId: DEV_USER_ID } });
   await prisma.transaction.deleteMany({ where: { userId: DEV_USER_ID } });
   await prisma.category.deleteMany({ where: { userId: DEV_USER_ID } });
