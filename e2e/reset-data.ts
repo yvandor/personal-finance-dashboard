@@ -52,6 +52,9 @@ async function main() {
   // Explicit, not relied-upon-via-cascade -- same discipline as tests/setup.ts.
   await prisma.savingsContribution.deleteMany({ where: { userId: DEV_USER_ID } });
   await prisma.savingsGoal.deleteMany({ where: { userId: DEV_USER_ID } });
+  // Transaction.incomeSourceId is onDelete: SetNull, not Cascade, and
+  // transactions are already wiped above.
+  await prisma.incomeSource.deleteMany({ where: { userId: DEV_USER_ID } });
 
   await prisma.user.upsert({
     where: { id: DEV_USER_ID },

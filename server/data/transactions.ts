@@ -25,6 +25,9 @@ export interface TransactionDTO {
   description: string;
   notes: string | null;
   categoryId: string | null;
+  // Optional link to the IncomeSource this transaction fulfills -- see
+  // lib/incomeSources.ts's getIncomeVsExpected, which reads this column.
+  incomeSourceId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,6 +46,7 @@ function toDTO(row: Transaction): TransactionDTO {
     description: row.description,
     notes: row.notes,
     categoryId: row.categoryId,
+    incomeSourceId: row.incomeSourceId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -79,6 +83,27 @@ async function assertUsableCategory(
     throw new ValidationError(
       `Category "${category.name}" is a ${category.type} category and cannot be used on a ${expectedType} transaction`,
     );
+  }
+}
+
+// A transaction may only reference an income source that (a) exists and
+// (b) is owned by the same user -- same-owner check as
+// assertUsableCategory. The type match (only an INCOME transaction can
+// carry a source) is application-level only, not a database constraint --
+// see prisma/schema.prisma's comment on Transaction.incomeSourceId.
+async function assertUsableIncomeSource(
+  incomeSourceId: string,
+  userId: string,
+  transactionType: TransactionType,
+): Promise<void> {
+  const source = await prisma.incomeSource.findFirst({
+    where: { id: incomeSourceId, userId },
+  });
+  if (!source) {
+    throw new NotFoundError("Income source not found");
+  }
+  if (transactionType !== "INCOME") {
+    throw new ValidationError("An income source can only be linked to an income transaction");
   }
 }
 
@@ -246,6 +271,9 @@ export async function createTransaction(input: unknown): Promise<TransactionDTO>
   const data = transactionCreateSchema.parse(input);
 
   await assertUsableCategory(data.categoryId, userId, data.type);
+  if (data.incomeSourceId) {
+    await assertUsableIncomeSource(data.incomeSourceId, userId, data.type);
+  }
 
   const created = await prisma.transaction.create({
     data: {
@@ -256,6 +284,7 @@ export async function createTransaction(input: unknown): Promise<TransactionDTO>
       description: data.description,
       notes: data.notes,
       categoryId: data.categoryId,
+      incomeSourceId: data.incomeSourceId ?? null,
     },
   });
 
@@ -274,6 +303,10 @@ export async function updateTransaction(id: string, input: unknown): Promise<Tra
   if (data.categoryId) {
     const effectiveType = data.type ?? existing.type;
     await assertUsableCategory(data.categoryId, userId, effectiveType);
+  }
+  if (data.incomeSourceId) {
+    const effectiveType = data.type ?? existing.type;
+    await assertUsableIncomeSource(data.incomeSourceId, userId, effectiveType);
   }
 
   // `updateMany` (not `update`) so the ownership check is part of the

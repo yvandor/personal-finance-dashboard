@@ -12,6 +12,7 @@ function makeTransaction(overrides: Partial<TransactionDTO> = {}): TransactionDT
     description: "Coffee",
     notes: null,
     categoryId: "cat1",
+    incomeSourceId: null,
     createdAt: "2026-03-10T00:00:00.000Z",
     updatedAt: "2026-03-10T00:00:00.000Z",
     ...overrides,

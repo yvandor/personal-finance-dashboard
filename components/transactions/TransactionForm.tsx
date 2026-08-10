@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/Button";
 import { parseMoneyToCents } from "@/lib/money";
 import type { TransactionDTO } from "@/server/data/transactions";
 import type { CategoryDTO } from "@/server/data/categories";
+import type { IncomeSourceDTO } from "@/server/data/incomeSources";
 import type { ActionResult } from "@/lib/result";
 
 interface TransactionFormProps {
   mode: "create" | "edit";
   transaction?: TransactionDTO;
   categories: CategoryDTO[];
+  /**
+   * Optional so every existing render/test call site keeps working
+   * unchanged. Only populated with active income sources -- see
+   * server/data/incomeSources.ts's listIncomeSources. Only relevant when
+   * `type === "INCOME"`; the Source picker is hidden entirely otherwise.
+   */
+  incomeSources?: IncomeSourceDTO[];
   onSuccess: () => void;
   /**
    * Optional so every existing render/test call site keeps working
@@ -38,6 +46,7 @@ export function TransactionForm({
   mode,
   transaction,
   categories,
+  incomeSources,
   onSuccess,
   onOptimisticAdd,
   onOptimisticUpdate,
@@ -66,6 +75,7 @@ export function TransactionForm({
       description: String(formData.get("description") ?? ""),
       notes: (formData.get("notes") as string) || null,
       categoryId: String(formData.get("categoryId") ?? ""),
+      incomeSourceId: (formData.get("incomeSourceId") as string) || null,
     };
     if (mode === "create" && onOptimisticAdd) {
       const now = new Date().toISOString();
@@ -88,6 +98,7 @@ export function TransactionForm({
   const [amount, setAmount] = useState(transaction ? (transaction.amountCents / 100).toFixed(2) : "");
   const [date, setDate] = useState(transaction?.date ?? new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? "");
+  const [incomeSourceId, setIncomeSourceId] = useState(transaction?.incomeSourceId ?? "");
   const [description, setDescription] = useState(transaction?.description ?? "");
   const [notes, setNotes] = useState(transaction?.notes ?? "");
 
@@ -111,6 +122,15 @@ export function TransactionForm({
   useLayoutEffect(() => {
     if (categorySelectRef.current && categorySelectRef.current.value !== categoryId) {
       categorySelectRef.current.value = categoryId;
+    }
+  });
+
+  // Same belt-and-suspenders fix as categorySelectRef above, for the
+  // Source <select> below.
+  const incomeSourceSelectRef = useRef<HTMLSelectElement>(null);
+  useLayoutEffect(() => {
+    if (incomeSourceSelectRef.current && incomeSourceSelectRef.current.value !== incomeSourceId) {
+      incomeSourceSelectRef.current.value = incomeSourceId;
     }
   });
 
@@ -233,6 +253,36 @@ export function TransactionForm({
           </p>
         )}
       </div>
+
+      {type === "INCOME" && (
+        <div>
+          <label htmlFor={fieldId("incomeSourceId")} className="mb-1 block text-sm font-medium">
+            Source <span className="font-normal text-muted">(optional)</span>
+          </label>
+          <select
+            ref={incomeSourceSelectRef}
+            id={fieldId("incomeSourceId")}
+            name="incomeSourceId"
+            value={incomeSourceId}
+            onChange={(e) => setIncomeSourceId(e.target.value)}
+            aria-invalid={fieldErrors?.incomeSourceId ? true : undefined}
+            aria-describedby={fieldErrors?.incomeSourceId ? fieldId("incomeSourceId-error") : undefined}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          >
+            <option value="">No source</option>
+            {(incomeSources ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {fieldErrors?.incomeSourceId && (
+            <p id={fieldId("incomeSourceId-error")} role="alert" className="mt-1 text-sm text-danger">
+              {fieldErrors.incomeSourceId[0]}
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor={fieldId("description")} className="mb-1 block text-sm font-medium">

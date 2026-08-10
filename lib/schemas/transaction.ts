@@ -32,6 +32,15 @@ export const transactionCreateSchema = z
     description: z.string().trim().min(1).max(200),
     notes: z.string().trim().max(1000).optional(),
     categoryId: z.cuid(),
+    // Optional link to an expected IncomeSource this transaction fulfills
+    // -- only meaningful for type = INCOME (enforced in
+    // server/data/transactions.ts's assertUsableIncomeSource, not here,
+    // same split as categoryId's type-match check). `.nullable()` (not just
+    // `.optional()`) so an existing link can be explicitly cleared on
+    // update, not just left unset on create -- see
+    // server/actions/transactions.ts's extractTransactionFields, which
+    // always resends this field as a cuid or null, never omits it.
+    incomeSourceId: z.cuid().nullable().optional(),
   })
   .strict();
 

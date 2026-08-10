@@ -35,7 +35,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
     return errorResult("Please fix the highlighted fields.", fieldErrors);
   }
   if (err instanceof NotFoundError) {
-    return errorResult("That transaction or category couldn't be found.");
+    return errorResult("That transaction, category, or income source couldn't be found.");
   }
   if (err instanceof ValidationError) {
     return errorResult(err.message);
@@ -51,6 +51,10 @@ interface TransactionFieldInput {
   description: FormDataEntryValue | null;
   notes: FormDataEntryValue | undefined;
   categoryId: FormDataEntryValue | null;
+  // Always resent as an explicit cuid string or `null` -- never omitted --
+  // so an update can clear an existing link, not just set a new one. See
+  // lib/schemas/transaction.ts's comment on incomeSourceId.
+  incomeSourceId: string | null;
 }
 
 type ExtractResult =
@@ -74,6 +78,9 @@ function extractTransactionFields(formData: FormData): ExtractResult {
     };
   }
 
+  const incomeSourceIdRaw = formData.get("incomeSourceId");
+  const incomeSourceId = typeof incomeSourceIdRaw === "string" && incomeSourceIdRaw !== "" ? incomeSourceIdRaw : null;
+
   return {
     ok: true,
     data: {
@@ -83,6 +90,7 @@ function extractTransactionFields(formData: FormData): ExtractResult {
       description: formData.get("description"),
       notes: formData.get("notes") || undefined,
       categoryId: formData.get("categoryId"),
+      incomeSourceId,
     },
   };
 }
