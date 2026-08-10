@@ -1,14 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/ToastProvider";
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/transactions", label: "Transactions" },
-  { href: "/budgets", label: "Budgets" },
-  { href: "/goals", label: "Goals" },
-  { href: "/categories", label: "Categories" },
-];
+import { MobileNav } from "@/components/layout/MobileNav";
+import { NAV_ITEMS } from "@/lib/navigation";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -32,9 +26,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        {/* Mobile top bar -- a bottom nav isn't worth it yet for a single route */}
+        {/* Mobile top bar: hamburger opens the full nav in a slide-over drawer */}
         <header className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
           <span className="text-lg font-semibold">Finance</span>
+          <MobileNav />
         </header>
 
         <main className="min-w-0 flex-1">{children}</main>

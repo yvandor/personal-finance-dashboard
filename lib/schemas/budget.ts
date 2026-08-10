@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MAX_AMOUNT_CENTS } from "@/lib/schemas/transaction";
 
-const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Expected a month in YYYY-MM format");
+export const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Expected a month in YYYY-MM format");
 
 // Budgets are allowed to be zero (the `budgets_amount_nonneg` CHECK
 // constraint permits it, and it's a legitimate "track this category but
@@ -38,3 +38,12 @@ export const budgetFilterSchema = z
   .strict();
 
 export type BudgetFilterInput = z.input<typeof budgetFilterSchema>;
+
+export const copyBudgetsSchema = z
+  .object({
+    fromMonth: monthSchema,
+    toMonth: monthSchema,
+  })
+  .strict();
+
+export type CopyBudgetsInput = z.infer<typeof copyBudgetsSchema>;

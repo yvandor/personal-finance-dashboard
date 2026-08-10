@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createBudget, updateBudget, deleteBudget, type BudgetDTO } from "@/server/data/budgets";
+import {
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  copyBudgetsFromMonth,
+  type BudgetDTO,
+  type CopyBudgetsResult,
+} from "@/server/data/budgets";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import type { ActionResult } from "@/lib/result";
@@ -109,6 +116,22 @@ export async function deleteBudgetAction(
     await deleteBudget(id);
     revalidateBudgetPaths();
     return { ok: true, data: undefined };
+  } catch (err) {
+    return toErrorResult(err);
+  }
+}
+
+export async function copyBudgetsFromMonthAction(
+  input: { fromMonth: string; toMonth: string },
+  // Same not-a-form shape as deleteBudgetAction -- called directly from
+  // BudgetsBoard's "Copy last month's budgets" button, not a <form action>.
+  prevState: ActionResult<CopyBudgetsResult> | null,
+): Promise<ActionResult<CopyBudgetsResult>> {
+  void prevState;
+  try {
+    const result = await copyBudgetsFromMonth(input);
+    revalidateBudgetPaths();
+    return { ok: true, data: result };
   } catch (err) {
     return toErrorResult(err);
   }

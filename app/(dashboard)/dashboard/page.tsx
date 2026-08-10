@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { getDashboardSummary, getMonthlyTrend, getCategoryBreakdown } from "@/server/data/dashboard";
 import { listTransactions } from "@/server/data/transactions";
 import { listCategories } from "@/server/data/categories";
 import { getCurrentUserCurrency } from "@/server/data/users";
 import { getCurrentMonthBudgetStatus } from "@/server/data/budgets";
+import { listRecurringBills } from "@/server/data/recurringBills";
+import { getIncomeVsExpected } from "@/server/data/incomeSources";
 import { dashboardFilterSchema } from "@/lib/schemas/dashboard";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
@@ -10,6 +13,8 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { CategoryBreakdownChart } from "@/components/dashboard/CategoryBreakdownChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { BudgetStatusSummary } from "@/components/dashboard/BudgetStatusSummary";
+import { UpcomingBillsWidget } from "@/components/dashboard/UpcomingBillsWidget";
+import { IncomeStatusSummary } from "@/components/dashboard/IncomeStatusSummary";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -33,15 +38,18 @@ export default async function DashboardPage({
   // caller.
   const { period } = dashboardFilterSchema.parse(rawFilters);
 
-  const [summary, trend, breakdown, recent, categories, currency, budgetStatus] = await Promise.all([
-    getDashboardSummary(rawFilters),
-    getMonthlyTrend(rawFilters),
-    getCategoryBreakdown(rawFilters),
-    listTransactions({ take: 5 }),
-    listCategories(),
-    getCurrentUserCurrency(),
-    getCurrentMonthBudgetStatus(),
-  ]);
+  const [summary, trend, breakdown, recent, categories, currency, budgetStatus, bills, incomeStatus] =
+    await Promise.all([
+      getDashboardSummary(rawFilters),
+      getMonthlyTrend(rawFilters),
+      getCategoryBreakdown(rawFilters),
+      listTransactions({ take: 5 }),
+      listCategories(),
+      getCurrentUserCurrency(),
+      getCurrentMonthBudgetStatus(),
+      listRecurringBills(),
+      getIncomeVsExpected(),
+    ]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
@@ -55,7 +63,18 @@ export default async function DashboardPage({
 
       <DashboardSummaryCards summary={summary} currency={currency} />
 
-      <BudgetStatusSummary status={budgetStatus} currency={currency} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <BudgetStatusSummary status={budgetStatus} currency={currency} />
+        <IncomeStatusSummary status={incomeStatus} currency={currency} />
+      </div>
+
+      <UpcomingBillsWidget bills={bills} currency={currency} />
+
+      <div className="flex justify-end">
+        <Link href="/history" className="text-sm font-medium text-accent hover:underline">
+          View month-to-month history
+        </Link>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TrendChart data={trend} currency={currency} />

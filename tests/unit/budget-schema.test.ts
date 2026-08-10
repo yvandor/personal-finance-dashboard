@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema } from "@/lib/schemas/budget";
+import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema, copyBudgetsSchema } from "@/lib/schemas/budget";
 
 const validCreateInput = {
   categoryId: "clh3ans2z0000356ub9pu9q0m",
@@ -84,5 +84,23 @@ describe("budgetFilterSchema", () => {
 
   it("rejects a malformed month filter", () => {
     expect(() => budgetFilterSchema.parse({ month: "2026" })).toThrow();
+  });
+});
+
+describe("copyBudgetsSchema", () => {
+  it("accepts valid from/to months", () => {
+    expect(copyBudgetsSchema.parse({ fromMonth: "2026-02", toMonth: "2026-03" })).toEqual({
+      fromMonth: "2026-02",
+      toMonth: "2026-03",
+    });
+  });
+
+  it("rejects a malformed month in either field", () => {
+    expect(() => copyBudgetsSchema.parse({ fromMonth: "2026", toMonth: "2026-03" })).toThrow();
+    expect(() => copyBudgetsSchema.parse({ fromMonth: "2026-02", toMonth: "March" })).toThrow();
+  });
+
+  it("rejects an unknown extra field (mass-assignment guard)", () => {
+    expect(() => copyBudgetsSchema.parse({ fromMonth: "2026-02", toMonth: "2026-03", userId: "x" })).toThrow();
   });
 });

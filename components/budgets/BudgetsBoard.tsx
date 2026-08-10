@@ -5,6 +5,7 @@ import { budgetOptimisticReducer } from "@/lib/budgets";
 import { MonthSelector } from "./MonthSelector";
 import { BudgetFormDialog } from "./BudgetFormDialog";
 import { BudgetList } from "./BudgetList";
+import { CopyLastMonthBudgetsButton } from "./CopyLastMonthBudgetsButton";
 import type { BudgetProgressDTO } from "@/server/data/budgets";
 import type { CategoryDTO } from "@/server/data/categories";
 
@@ -38,6 +39,10 @@ export function BudgetsBoard({ budgets, availableCategories, month, currency }: 
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <MonthSelector month={month} />
+          <CopyLastMonthBudgetsButton
+            month={month}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-60"
+          />
           <BudgetFormDialog
             mode="create"
             categories={availableCategories}

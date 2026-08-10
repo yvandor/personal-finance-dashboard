@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
-import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema } from "@/lib/schemas/budget";
+import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema, copyBudgetsSchema } from "@/lib/schemas/budget";
 import { monthKeyRange, currentMonthKey } from "@/lib/dates";
 import { computeBudgetProgress } from "@/lib/budgets";
 import { Prisma } from "@/app/generated/prisma/client";
@@ -205,4 +205,49 @@ export async function deleteBudget(id: string): Promise<void> {
   if (result.count === 0) {
     throw new NotFoundError("Budget not found");
   }
+}
+
+export interface CopyBudgetsResult {
+  copiedCount: number;
+  skippedCount: number;
+}
+
+// Reduces the monthly setup chore without introducing rollover (see
+// docs/PROJECT_PLAN.md's v1.3 notes) -- budgets stay strictly one row per
+// category per month; this just bulk-creates rows for the target month from
+// last month's amounts. Reuses createBudget one row at a time (not a bulk
+// insert) so the existing assertBudgetableCategory check and P2002-to-
+// ValidationError translation both apply per row -- a category that's since
+// been archived, changed type, or is already budgeted this month is
+// silently skipped rather than aborting the whole copy.
+export async function copyBudgetsFromMonth(input: unknown): Promise<CopyBudgetsResult> {
+  const userId = await requireUserId();
+  const { fromMonth, toMonth } = copyBudgetsSchema.parse(input);
+  const { start } = monthKeyRange(fromMonth);
+
+  const sourceBudgets = await prisma.budget.findMany({
+    where: { userId, periodStart: new Date(start) },
+  });
+
+  let copiedCount = 0;
+  let skippedCount = 0;
+  for (const budget of sourceBudgets) {
+    try {
+      await createBudget({
+        categoryId: budget.categoryId,
+        month: toMonth,
+        amountCents: budget.amountCents,
+        notes: budget.notes ?? undefined,
+      });
+      copiedCount++;
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof NotFoundError) {
+        skippedCount++;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  return { copiedCount, skippedCount };
 }

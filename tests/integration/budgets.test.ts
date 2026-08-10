@@ -8,7 +8,9 @@ import {
   deleteBudget,
   listBudgetsWithProgress,
   getCurrentMonthBudgetStatus,
+  copyBudgetsFromMonth,
 } from "@/server/data/budgets";
+import { archiveCategory } from "@/server/data/categories";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { currentMonthKey } from "@/lib/dates";
 import { DEV_USER_ID, OTHER_USER_ID, createTestCategory, resetTestData } from "../setup";
@@ -362,6 +364,64 @@ describe("budgets DAL", () => {
       expect(status.totalBudgetedCents).toBe(10000);
       expect(status.totalSpentCents).toBe(9000);
       expect(status.overBudgetCount).toBe(1);
+    });
+  });
+
+  describe("copyBudgetsFromMonth", () => {
+    it("copies each of last month's budgets into this month with the same amount", async () => {
+      const cat1 = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      const cat2 = await createTestCategory(DEV_USER_ID, "EXPENSE", "Dining");
+      await createBudget({ categoryId: cat1.id, month: lastMonth, amountCents: 30000, notes: "carried" });
+      await createBudget({ categoryId: cat2.id, month: lastMonth, amountCents: 12000 });
+
+      const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
+      expect(result).toEqual({ copiedCount: 2, skippedCount: 0 });
+
+      const thisMonthBudgets = await listBudgetsWithProgress({ month: thisMonth });
+      expect(thisMonthBudgets).toHaveLength(2);
+      expect(thisMonthBudgets.find((b) => b.categoryId === cat1.id)).toMatchObject({
+        amountCents: 30000,
+        notes: "carried",
+      });
+      expect(thisMonthBudgets.find((b) => b.categoryId === cat2.id)).toMatchObject({ amountCents: 12000 });
+    });
+
+    it("skips (not throws) a category already budgeted this month", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await createBudget({ categoryId: cat.id, month: lastMonth, amountCents: 30000 });
+      await createBudget({ categoryId: cat.id, month: thisMonth, amountCents: 99999 });
+
+      const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
+      expect(result).toEqual({ copiedCount: 0, skippedCount: 1 });
+
+      // The existing this-month budget is untouched, not overwritten.
+      const thisMonthBudgets = await listBudgetsWithProgress({ month: thisMonth });
+      expect(thisMonthBudgets).toHaveLength(1);
+      expect(thisMonthBudgets[0].amountCents).toBe(99999);
+    });
+
+    it("skips (not throws) a category archived since last month", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Old Gym");
+      await createBudget({ categoryId: cat.id, month: lastMonth, amountCents: 5000 });
+      await archiveCategory(cat.id);
+
+      const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
+      expect(result).toEqual({ copiedCount: 0, skippedCount: 1 });
+    });
+
+    it("returns zero counts when last month had no budgets", async () => {
+      const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
+      expect(result).toEqual({ copiedCount: 0, skippedCount: 0 });
+    });
+
+    it("never copies another user's budgets", async () => {
+      const otherCat = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Other's Rent");
+      actAs(OTHER_USER_ID);
+      await createBudget({ categoryId: otherCat.id, month: lastMonth, amountCents: 150000 });
+
+      actAs(DEV_USER_ID);
+      const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
+      expect(result).toEqual({ copiedCount: 0, skippedCount: 0 });
     });
   });
 });
