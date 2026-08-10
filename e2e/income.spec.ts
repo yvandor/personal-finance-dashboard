@@ -66,8 +66,15 @@ test.describe("Income sources critical path", () => {
     await page.getByRole("button", { name: "Add transaction", exact: true }).click();
     const txDialog = page.getByRole("dialog", { name: "Add transaction" });
     await expect(txDialog).toBeVisible();
-    await txDialog.getByLabel("Expense").check();
-    await txDialog.getByLabel("Income").check();
+    // The Income/Expense toggle's radio input is visually hidden (sr-only)
+    // with its styled <label> sitting on top -- Playwright's actionability
+    // check for `.check()` waits on the input itself being the hit target,
+    // which the label always intercepts. `.click({ force: true })` on the
+    // input directly (bypassing that check, same as a real click on the
+    // label would do visually) is the fix used everywhere this toggle is
+    // exercised in this spec.
+    await txDialog.getByLabel("Expense").click({ force: true });
+    await txDialog.getByLabel("Income").click({ force: true });
     await txDialog.getByLabel("Amount").fill("2500.00");
     await txDialog.getByLabel("Category").selectOption({ label: "Salary" });
     const sourceField = txDialog.getByLabel("Source");
@@ -97,7 +104,7 @@ test.describe("Income sources critical path", () => {
     await page.goto("/transactions");
     await page.getByRole("button", { name: "Add transaction", exact: true }).click();
     const newTxDialog = page.getByRole("dialog", { name: "Add transaction" });
-    await newTxDialog.getByLabel("Income").check();
+    await newTxDialog.getByLabel("Income").click({ force: true });
     const sourceOptions = await newTxDialog.getByLabel("Source").locator("option").allTextContents();
     expect(sourceOptions).not.toContain("Main Job");
     await newTxDialog.getByRole("button", { name: "Close" }).click();
@@ -113,7 +120,7 @@ test.describe("Income sources critical path", () => {
     await page.goto("/transactions");
     await page.getByRole("button", { name: "Add transaction", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add transaction" });
-    await dialog.getByLabel("Income").check();
+    await dialog.getByLabel("Income").click({ force: true });
     await dialog.getByLabel("Amount").fill("50.00");
     await dialog.getByLabel("Category").selectOption({ label: "Salary" });
     // Source is left at its default "No source" option.
