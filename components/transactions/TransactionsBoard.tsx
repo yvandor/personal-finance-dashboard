@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic } from "react";
-import { transactionOptimisticReducer } from "@/lib/transactions";
+import { transactionOptimisticReducer, transactionsSummaryOptimisticReducer } from "@/lib/transactions";
 import { SummaryCards } from "./SummaryCards";
 import { TransactionFilters } from "./TransactionFilters";
 import { TransactionFormDialog } from "./TransactionFormDialog";
@@ -25,11 +25,13 @@ interface TransactionsBoardProps {
 const PRIMARY_BUTTON_CLASSES =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
 
-// Owns the useOptimistic overlay so the header's "Add transaction" trigger
-// and the list below it share one optimistic array -- same shape as
-// components/budgets/BudgetsBoard.tsx. Edit/delete are wired regardless of
-// view (they mutate a row already present on screen); create is only wired
-// when isDefaultView is true.
+// Owns two useOptimistic overlays -- one for the row list, one for
+// SummaryCards' totals -- so the header's "Add transaction" trigger and the
+// list below it stay in sync, including the totals, throughout a pending
+// transition (e.g. DeleteTransactionButton's undo window). See
+// lib/transactions.ts's transactionsSummaryOptimisticReducer for why the
+// totals need their own adjustment rather than being derived from the row
+// list (pagination means the visible page is not the full matching set).
 export function TransactionsBoard({
   transactions,
   categories,
@@ -40,6 +42,25 @@ export function TransactionsBoard({
   isDefaultView,
 }: TransactionsBoardProps) {
   const [optimisticTransactions, dispatch] = useOptimistic(transactions, transactionOptimisticReducer);
+  const [optimisticSummary, dispatchSummary] = useOptimistic(summary, transactionsSummaryOptimisticReducer);
+
+  // Restoring a transaction (undo, or re-adding after a failed real delete)
+  // is never gated by isDefaultView -- unlike a brand-new transaction from
+  // the create form, it was already part of the currently-visible (however
+  // filtered/paginated) set a moment ago, so both the row and its
+  // contribution to the totals belong back unconditionally.
+  function restoreTransaction(transaction: TransactionDTO) {
+    dispatch({ type: "add", transaction });
+    dispatchSummary({ type: "add", transaction });
+  }
+
+  function removeTransaction(id: string) {
+    const removed = optimisticTransactions.find((t) => t.id === id);
+    dispatch({ type: "remove", id });
+    if (removed) {
+      dispatchSummary({ type: "remove", transaction: removed });
+    }
+  }
 
   return (
     <>
@@ -52,13 +73,20 @@ export function TransactionsBoard({
           mode="create"
           categories={categories}
           triggerClassName={PRIMARY_BUTTON_CLASSES}
-          onOptimisticAdd={isDefaultView ? (transaction) => dispatch({ type: "add", transaction }) : undefined}
+          onOptimisticAdd={
+            isDefaultView
+              ? (transaction) => {
+                  dispatch({ type: "add", transaction });
+                  dispatchSummary({ type: "add", transaction });
+                }
+              : undefined
+          }
         >
           Add transaction
         </TransactionFormDialog>
       </div>
 
-      <SummaryCards summary={summary} currency={currency} />
+      <SummaryCards summary={optimisticSummary} currency={currency} />
 
       <TransactionFilters categories={categories} />
 
@@ -68,8 +96,9 @@ export function TransactionsBoard({
           categories={categories}
           currency={currency}
           hasActiveFilters={hasActiveFilters}
+          onOptimisticAdd={restoreTransaction}
           onOptimisticUpdate={(id, patch) => dispatch({ type: "update", id, patch })}
-          onOptimisticRemove={(id) => dispatch({ type: "remove", id })}
+          onOptimisticRemove={removeTransaction}
         />
         <Pager {...pager} itemsCount={optimisticTransactions.length} />
       </div>

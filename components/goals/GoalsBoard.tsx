@@ -43,6 +43,7 @@ export function GoalsBoard({ goals, contributionsByGoal, currency }: GoalsBoardP
         goals={optimisticGoals}
         contributionsByGoal={contributionsByGoal}
         currency={currency}
+        onOptimisticAdd={(goal) => dispatch({ type: "add", goal })}
         onOptimisticUpdate={(id, patch) => dispatch({ type: "update", id, patch })}
         onOptimisticRemove={(id) => dispatch({ type: "remove", id })}
       />

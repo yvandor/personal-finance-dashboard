@@ -9,6 +9,7 @@ interface TransactionTableRowProps {
   categoryName: string;
   categories: CategoryDTO[];
   currency?: string;
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
@@ -18,6 +19,7 @@ export function TransactionTableRow({
   categoryName,
   categories,
   currency,
+  onOptimisticAdd,
   onOptimisticUpdate,
   onOptimisticRemove,
 }: TransactionTableRowProps) {
@@ -51,9 +53,9 @@ export function TransactionTableRow({
             </svg>
           </TransactionFormDialog>
           <DeleteTransactionButton
-            id={transaction.id}
-            description={transaction.description}
+            transaction={transaction}
             compact
+            onOptimisticAdd={onOptimisticAdd}
             onOptimisticRemove={onOptimisticRemove}
           />
         </div>

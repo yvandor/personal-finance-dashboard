@@ -13,6 +13,7 @@ interface GoalCardProps {
   goal: SavingsGoalProgressDTO;
   contributions: ContributionDTO[];
   currency?: string;
+  onOptimisticAdd?: (goal: SavingsGoalProgressDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<SavingsGoalProgressDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
@@ -49,7 +50,14 @@ function PaceHint({ goal }: { goal: SavingsGoalProgressDTO }) {
   );
 }
 
-export function GoalCard({ goal, contributions, currency, onOptimisticUpdate, onOptimisticRemove }: GoalCardProps) {
+export function GoalCard({
+  goal,
+  contributions,
+  currency,
+  onOptimisticAdd,
+  onOptimisticUpdate,
+  onOptimisticRemove,
+}: GoalCardProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
@@ -101,7 +109,7 @@ export function GoalCard({ goal, contributions, currency, onOptimisticUpdate, on
             />
           </svg>
         </GoalFormDialog>
-        <DeleteGoalButton id={goal.id} name={goal.name} onOptimisticRemove={onOptimisticRemove} />
+        <DeleteGoalButton goal={goal} onOptimisticAdd={onOptimisticAdd} onOptimisticRemove={onOptimisticRemove} />
         <button
           type="button"
           onClick={() => setHistoryOpen((v) => !v)}

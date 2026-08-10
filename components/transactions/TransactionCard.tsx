@@ -9,6 +9,7 @@ interface TransactionCardProps {
   categoryName: string;
   categories: CategoryDTO[];
   currency?: string;
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
@@ -18,6 +19,7 @@ export function TransactionCard({
   categoryName,
   categories,
   currency,
+  onOptimisticAdd,
   onOptimisticUpdate,
   onOptimisticRemove,
 }: TransactionCardProps) {
@@ -45,8 +47,8 @@ export function TransactionCard({
           Edit
         </TransactionFormDialog>
         <DeleteTransactionButton
-          id={transaction.id}
-          description={transaction.description}
+          transaction={transaction}
+          onOptimisticAdd={onOptimisticAdd}
           onOptimisticRemove={onOptimisticRemove}
         />
       </div>

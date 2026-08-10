@@ -2,10 +2,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BudgetsBoard } from "@/components/budgets/BudgetsBoard";
-import { createBudgetAction, deleteBudgetAction } from "@/server/actions/budgets";
+import { createBudgetAction } from "@/server/actions/budgets";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import type { CategoryDTO } from "@/server/data/categories";
 import type { ActionResult } from "@/lib/result";
 import type { BudgetDTO } from "@/server/data/budgets";
+import type { ReactElement } from "react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -21,7 +23,6 @@ vi.mock("@/server/actions/budgets", () => ({
 
 beforeEach(() => {
   vi.mocked(createBudgetAction).mockReset();
-  vi.mocked(deleteBudgetAction).mockReset();
 });
 
 const categories: CategoryDTO[] = [{ id: "cat-groceries", type: "EXPENSE", name: "Groceries", color: "#000" }];
@@ -30,13 +31,17 @@ function outsideDialog(text: string) {
   return (content: string, element: Element | null) => content === text && !element?.closest("dialog");
 }
 
-// Deferred so the test controls exactly when the mocked Server Action
-// settles, proving the row appears BEFORE that resolution -- true
-// optimism, not just "the list updates quickly."
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((r) => (resolve = r));
   return { promise, resolve };
+}
+
+// BudgetsBoard's DeleteBudgetButton descendant calls useToast(), which
+// throws outside a ToastProvider -- the real app provides this from
+// app/(dashboard)/layout.tsx.
+function renderWithToast(ui: ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
 }
 
 async function openCreateDialogAndFill(user: ReturnType<typeof userEvent.setup>) {
@@ -53,7 +58,9 @@ describe("BudgetsBoard", () => {
     const { promise, resolve } = deferred<ActionResult<BudgetDTO>>();
     vi.mocked(createBudgetAction).mockReturnValueOnce(promise);
 
-    render(<BudgetsBoard budgets={[]} availableCategories={categories} month="2026-03" currency="USD" />);
+    renderWithToast(
+      <BudgetsBoard budgets={[]} availableCategories={categories} month="2026-03" currency="USD" />,
+    );
     expect(screen.getByText("No budgets set for this month yet")).toBeInTheDocument();
 
     await openCreateDialogAndFill(user);
@@ -81,7 +88,9 @@ describe("BudgetsBoard", () => {
     const { promise, resolve } = deferred<ActionResult<BudgetDTO>>();
     vi.mocked(createBudgetAction).mockReturnValueOnce(promise);
 
-    render(<BudgetsBoard budgets={[]} availableCategories={categories} month="2026-03" currency="USD" />);
+    renderWithToast(
+      <BudgetsBoard budgets={[]} availableCategories={categories} month="2026-03" currency="USD" />,
+    );
 
     await openCreateDialogAndFill(user);
     await waitFor(() => expect(screen.queryByText("No budgets set for this month yet")).not.toBeInTheDocument());
@@ -91,10 +100,8 @@ describe("BudgetsBoard", () => {
     await waitFor(() => expect(screen.getByText("No budgets set for this month yet")).toBeInTheDocument());
   });
 
-  it("removes a budget from the list immediately on delete, before the server action resolves", async () => {
+  it("removes a budget from the list immediately on delete confirm (the real delete waits behind the undo toast)", async () => {
     const user = userEvent.setup();
-    const { promise, resolve } = deferred<ActionResult<void>>();
-    vi.mocked(deleteBudgetAction).mockReturnValueOnce(promise);
 
     const budgets = [
       {
@@ -110,16 +117,16 @@ describe("BudgetsBoard", () => {
         isOverBudget: false,
       },
     ];
-    render(<BudgetsBoard budgets={budgets} availableCategories={[]} month="2026-03" currency="USD" />);
+    renderWithToast(
+      <BudgetsBoard budgets={budgets} availableCategories={[]} month="2026-03" currency="USD" />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Delete budget for Groceries" }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
-    // Still pending -- the mocked action hasn't resolved -- yet the row is already gone.
+    // Removed immediately -- the row is gone well before DeleteBudgetButton's
+    // undo window (5s default) would have elapsed. The full undo/commit
+    // cycle itself is covered by tests/unit/components/DeleteBudgetButton.test.tsx.
     await waitFor(() => expect(screen.getByText("No budgets set for this month yet")).toBeInTheDocument());
-
-    resolve({ ok: true, data: undefined });
-    // Stays gone once the (successful) real delete settles too.
-    expect(screen.getByText("No budgets set for this month yet")).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ interface TransactionListProps {
   categories: CategoryDTO[];
   currency?: string;
   hasActiveFilters: boolean;
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<TransactionDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
@@ -20,6 +21,7 @@ export function TransactionList({
   categories,
   currency,
   hasActiveFilters,
+  onOptimisticAdd,
   onOptimisticUpdate,
   onOptimisticRemove,
 }: TransactionListProps) {
@@ -73,6 +75,7 @@ export function TransactionList({
               categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
               categories={categories}
               currency={currency}
+              onOptimisticAdd={onOptimisticAdd}
               onOptimisticUpdate={onOptimisticUpdate}
               onOptimisticRemove={onOptimisticRemove}
             />
@@ -88,6 +91,7 @@ export function TransactionList({
             categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
             categories={categories}
             currency={currency}
+            onOptimisticAdd={onOptimisticAdd}
             onOptimisticUpdate={onOptimisticUpdate}
             onOptimisticRemove={onOptimisticRemove}
           />

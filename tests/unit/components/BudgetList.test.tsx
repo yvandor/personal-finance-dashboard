@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BudgetList } from "@/components/budgets/BudgetList";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import type { BudgetProgressDTO } from "@/server/data/budgets";
+import type { ReactElement } from "react";
 
 // BudgetList -> BudgetCard -> BudgetFormDialog/DeleteBudgetButton import the
 // real Server Actions module. Next's bundler specially compiles a "use
@@ -47,14 +49,19 @@ function makeBudget(overrides: Partial<BudgetProgressDTO> = {}): BudgetProgressD
   };
 }
 
+// BudgetCard -> DeleteBudgetButton calls useToast(), which throws outside a ToastProvider.
+function renderWithToast(ui: ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
+}
+
 describe("BudgetList", () => {
   it("shows an empty-state message when there are no budgets", () => {
-    render(<BudgetList budgets={[]} currency="USD" />);
+    renderWithToast(<BudgetList budgets={[]} currency="USD" />);
     expect(screen.getByText("No budgets set for this month yet")).toBeInTheDocument();
   });
 
   it("renders a budget with correctly formatted currency, not raw cents", () => {
-    render(<BudgetList budgets={[makeBudget()]} currency="USD" />);
+    renderWithToast(<BudgetList budgets={[makeBudget()]} currency="USD" />);
 
     expect(screen.getByText(outsideDialog("Groceries"))).toBeInTheDocument();
     expect(screen.getByText("$200.00")).toBeInTheDocument(); // spent
@@ -69,7 +76,7 @@ describe("BudgetList", () => {
   });
 
   it('shows "On track" status text when comfortably under the limit', () => {
-    render(<BudgetList budgets={[makeBudget({ percentUsed: 67, isOverBudget: false })]} currency="USD" />);
+    renderWithToast(<BudgetList budgets={[makeBudget({ percentUsed: 67, isOverBudget: false })]} currency="USD" />);
     expect(screen.getByText("On track")).toBeInTheDocument();
   });
 
@@ -81,7 +88,7 @@ describe("BudgetList", () => {
       percentUsed: 85,
       isOverBudget: false,
     });
-    render(<BudgetList budgets={[nearLimit]} currency="USD" />);
+    renderWithToast(<BudgetList budgets={[nearLimit]} currency="USD" />);
     expect(screen.getByText("Near limit")).toBeInTheDocument();
     expect(screen.getByText(/remaining/)).toBeInTheDocument();
   });
@@ -94,13 +101,13 @@ describe("BudgetList", () => {
       percentUsed: 140,
       isOverBudget: true,
     });
-    render(<BudgetList budgets={[overBudget]} currency="USD" />);
+    renderWithToast(<BudgetList budgets={[overBudget]} currency="USD" />);
     expect(screen.getByText(/over budget/)).toBeInTheDocument();
     expect(screen.queryByText(/^remaining$/)).not.toBeInTheDocument();
   });
 
   it("renders multiple budgets in a different currency", () => {
-    render(
+    renderWithToast(
       <BudgetList
         budgets={[
           makeBudget({ id: "b1", categoryName: "Groceries" }),

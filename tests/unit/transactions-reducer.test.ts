@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { transactionOptimisticReducer } from "@/lib/transactions";
-import type { TransactionDTO } from "@/server/data/transactions";
+import { transactionOptimisticReducer, transactionsSummaryOptimisticReducer } from "@/lib/transactions";
+import type { TransactionDTO, TransactionsSummary } from "@/server/data/transactions";
 
 function makeTransaction(overrides: Partial<TransactionDTO> = {}): TransactionDTO {
   return {
@@ -61,5 +61,53 @@ describe("transactionOptimisticReducer", () => {
     const state = [makeTransaction({ id: "t1" }), makeTransaction({ id: "t2" })];
     const result = transactionOptimisticReducer(state, { type: "remove", id: "t1" });
     expect(result.map((t) => t.id)).toEqual(["t2"]);
+  });
+});
+
+const baseSummary: TransactionsSummary = { incomeCents: 10000, expenseCents: 4000, netCents: 6000, count: 5 };
+
+describe("transactionsSummaryOptimisticReducer", () => {
+  it("adding an expense increases expenseCents, decreases netCents, increments count", () => {
+    const result = transactionsSummaryOptimisticReducer(baseSummary, {
+      type: "add",
+      transaction: { type: "EXPENSE", amountCents: 1500 },
+    });
+    expect(result).toEqual({ incomeCents: 10000, expenseCents: 5500, netCents: 4500, count: 6 });
+  });
+
+  it("removing an expense decreases expenseCents, increases netCents, decrements count", () => {
+    const result = transactionsSummaryOptimisticReducer(baseSummary, {
+      type: "remove",
+      transaction: { type: "EXPENSE", amountCents: 1500 },
+    });
+    expect(result).toEqual({ incomeCents: 10000, expenseCents: 2500, netCents: 7500, count: 4 });
+  });
+
+  it("adding income increases incomeCents and netCents, increments count", () => {
+    const result = transactionsSummaryOptimisticReducer(baseSummary, {
+      type: "add",
+      transaction: { type: "INCOME", amountCents: 2000 },
+    });
+    expect(result).toEqual({ incomeCents: 12000, expenseCents: 4000, netCents: 8000, count: 6 });
+  });
+
+  it("removing income decreases incomeCents and netCents, decrements count", () => {
+    const result = transactionsSummaryOptimisticReducer(baseSummary, {
+      type: "remove",
+      transaction: { type: "INCOME", amountCents: 2000 },
+    });
+    expect(result).toEqual({ incomeCents: 8000, expenseCents: 4000, netCents: 4000, count: 4 });
+  });
+
+  it("add then remove of the same transaction is a net no-op", () => {
+    const added = transactionsSummaryOptimisticReducer(baseSummary, {
+      type: "add",
+      transaction: { type: "EXPENSE", amountCents: 999 },
+    });
+    const restored = transactionsSummaryOptimisticReducer(added, {
+      type: "remove",
+      transaction: { type: "EXPENSE", amountCents: 999 },
+    });
+    expect(restored).toEqual(baseSummary);
   });
 });

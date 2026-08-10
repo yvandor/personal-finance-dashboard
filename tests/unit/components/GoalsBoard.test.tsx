@@ -2,9 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GoalsBoard } from "@/components/goals/GoalsBoard";
-import { createSavingsGoalAction, contributeToGoalAction, deleteSavingsGoalAction } from "@/server/actions/savingsGoals";
+import { createSavingsGoalAction, contributeToGoalAction } from "@/server/actions/savingsGoals";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import type { ActionResult } from "@/lib/result";
 import type { SavingsGoalDTO, SavingsGoalProgressDTO } from "@/server/data/savingsGoals";
+import type { ReactElement } from "react";
 
 vi.mock("@/server/actions/savingsGoals", () => ({
   createSavingsGoalAction: vi.fn(),
@@ -16,7 +18,6 @@ vi.mock("@/server/actions/savingsGoals", () => ({
 beforeEach(() => {
   vi.mocked(createSavingsGoalAction).mockReset();
   vi.mocked(contributeToGoalAction).mockReset();
-  vi.mocked(deleteSavingsGoalAction).mockReset();
 });
 
 function outsideDialog(text: string) {
@@ -50,13 +51,20 @@ function makeGoal(overrides: Partial<SavingsGoalProgressDTO> = {}): SavingsGoalP
   };
 }
 
+// GoalsBoard's DeleteGoalButton descendant calls useToast(), which throws
+// outside a ToastProvider -- the real app provides this from
+// app/(dashboard)/layout.tsx.
+function renderWithToast(ui: ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
+}
+
 describe("GoalsBoard", () => {
   it("shows a new goal in the grid immediately, before the server action resolves", async () => {
     const user = userEvent.setup();
     const { promise, resolve } = deferred<ActionResult<SavingsGoalDTO>>();
     vi.mocked(createSavingsGoalAction).mockReturnValueOnce(promise);
 
-    render(<GoalsBoard goals={[]} contributionsByGoal={new Map()} currency="USD" />);
+    renderWithToast(<GoalsBoard goals={[]} contributionsByGoal={new Map()} currency="USD" />);
     expect(screen.getByText("No savings goals yet")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add goal" }));
@@ -91,7 +99,7 @@ describe("GoalsBoard", () => {
     const { promise, resolve } = deferred<ActionResult<SavingsGoalProgressDTO>>();
     vi.mocked(contributeToGoalAction).mockReturnValueOnce(promise);
 
-    render(<GoalsBoard goals={[makeGoal()]} contributionsByGoal={new Map()} currency="USD" />);
+    renderWithToast(<GoalsBoard goals={[makeGoal()]} contributionsByGoal={new Map()} currency="USD" />);
     expect(screen.getByText("80%")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add contribution to Trip" }));
@@ -115,19 +123,17 @@ describe("GoalsBoard", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("removes a goal from the grid immediately on delete, before the server action resolves", async () => {
+  it("removes a goal from the grid immediately on delete confirm (the real delete waits behind the undo toast)", async () => {
     const user = userEvent.setup();
-    const { promise, resolve } = deferred<ActionResult<void>>();
-    vi.mocked(deleteSavingsGoalAction).mockReturnValueOnce(promise);
 
-    render(<GoalsBoard goals={[makeGoal()]} contributionsByGoal={new Map()} currency="USD" />);
+    renderWithToast(<GoalsBoard goals={[makeGoal()]} contributionsByGoal={new Map()} currency="USD" />);
 
     await user.click(screen.getByRole("button", { name: "Delete goal Trip" }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
+    // Removed immediately -- the row is gone well before DeleteGoalButton's
+    // undo window (5s default) would have elapsed. The full undo/commit
+    // cycle itself is covered by tests/unit/components/DeleteGoalButton.test.tsx.
     await waitFor(() => expect(screen.getByText("No savings goals yet")).toBeInTheDocument());
-
-    resolve({ ok: true, data: undefined });
-    expect(screen.getByText("No savings goals yet")).toBeInTheDocument();
   });
 });

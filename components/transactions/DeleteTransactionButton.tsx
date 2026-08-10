@@ -3,38 +3,53 @@
 import { useState, useTransition } from "react";
 import { deleteTransactionAction } from "@/server/actions/transactions";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
+import type { TransactionDTO } from "@/server/data/transactions";
 
 interface DeleteTransactionButtonProps {
-  id: string;
-  description: string;
+  transaction: TransactionDTO;
   /** Compact icon-only trigger for table rows vs. a labeled button for mobile cards. */
   compact?: boolean;
   /** Optional so every existing render/test call site keeps working unchanged. */
+  onOptimisticAdd?: (transaction: TransactionDTO) => void;
   onOptimisticRemove?: (id: string) => void;
+  /** The undo window's length in ms. Defaults to 5000; overridable so tests don't need real 5-second waits. */
+  undoWindowMs?: number;
 }
 
+// Same shape as DeleteBudgetButton, including the confirm-dialog-plus-undo-toast
+// pairing -- see that component's comment for why both stay, and why the
+// optimistic dispatch and the eventual real delete share one transition.
 // Deliberately not useActionState here: this isn't a <form>, and closing
 // the dialog on success is an event-driven side effect of the confirm
 // click, not something to derive via a useEffect watching action state.
 export function DeleteTransactionButton({
-  id,
-  description,
+  transaction,
   compact = false,
+  onOptimisticAdd,
   onOptimisticRemove,
+  undoWindowMs = 5000,
 }: DeleteTransactionButtonProps) {
+  const { id, description } = transaction;
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { showToast, showNotice } = useToast();
 
   function handleConfirm() {
     setError(null);
+    setOpen(false);
     startTransition(async () => {
       onOptimisticRemove?.(id);
+      const undone = await showToast({ message: `Deleted "${description}"`, duration: undoWindowMs });
+      if (undone) {
+        onOptimisticAdd?.(transaction);
+        return;
+      }
       const result = await deleteTransactionAction(id, null);
-      if (result.ok) {
-        setOpen(false);
-      } else {
-        setError(result.error);
+      if (!result.ok) {
+        onOptimisticAdd?.(transaction);
+        showNotice(`Couldn't delete "${description}": ${result.error}`);
       }
     });
   }
@@ -73,7 +88,7 @@ export function DeleteTransactionButton({
       <ConfirmDialog
         open={open}
         title="Delete transaction?"
-        description={`This will permanently delete "${description}". This can't be undone.`}
+        description={`This will delete "${description}". You'll have a few seconds to undo it afterward.`}
         pending={isPending}
         error={error}
         onCancel={() => setOpen(false)}

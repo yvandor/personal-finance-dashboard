@@ -7,11 +7,12 @@ import type { BudgetProgressDTO } from "@/server/data/budgets";
 interface BudgetCardProps {
   budget: BudgetProgressDTO;
   currency?: string;
+  onOptimisticAdd?: (budget: BudgetProgressDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<BudgetProgressDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
 
-export function BudgetCard({ budget, currency, onOptimisticUpdate, onOptimisticRemove }: BudgetCardProps) {
+export function BudgetCard({ budget, currency, onOptimisticAdd, onOptimisticUpdate, onOptimisticRemove }: BudgetCardProps) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
@@ -39,11 +40,7 @@ export function BudgetCard({ budget, currency, onOptimisticUpdate, onOptimisticR
               />
             </svg>
           </BudgetFormDialog>
-          <DeleteBudgetButton
-            id={budget.id}
-            categoryName={budget.categoryName}
-            onOptimisticRemove={onOptimisticRemove}
-          />
+          <DeleteBudgetButton budget={budget} onOptimisticAdd={onOptimisticAdd} onOptimisticRemove={onOptimisticRemove} />
         </div>
       </div>
 

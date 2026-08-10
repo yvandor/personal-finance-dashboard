@@ -53,6 +53,7 @@ export function BudgetsBoard({ budgets, availableCategories, month, currency }: 
       <BudgetList
         budgets={optimisticBudgets}
         currency={currency}
+        onOptimisticAdd={(budget) => dispatch({ type: "add", budget })}
         onOptimisticUpdate={(id, patch) => dispatch({ type: "update", id, patch })}
         onOptimisticRemove={(id) => dispatch({ type: "remove", id })}
       />
