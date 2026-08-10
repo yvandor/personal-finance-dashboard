@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePeriodRange, monthKeyRange, currentMonthKey, shiftMonthKey } from "@/lib/dates";
+import { resolvePeriodRange, monthKeyRange, currentMonthKey, shiftMonthKey, monthsBetween } from "@/lib/dates";
 
 // A fixed reference "now" throughout -- these are relative-period
 // calculations ("current month", "current year"), so every test injects
@@ -84,5 +84,24 @@ describe("shiftMonthKey", () => {
 
   it("is a no-op with a zero delta", () => {
     expect(shiftMonthKey("2026-06", 0)).toBe("2026-06");
+  });
+});
+
+describe("monthsBetween", () => {
+  it("counts whole months when the day-of-month has been reached", () => {
+    expect(monthsBetween(new Date("2026-01-15T00:00:00Z"), new Date("2026-04-15T00:00:00Z"))).toBe(3);
+  });
+
+  it("does not round up a partial month", () => {
+    expect(monthsBetween(new Date("2026-01-15T00:00:00Z"), new Date("2026-04-10T00:00:00Z"))).toBe(2);
+  });
+
+  it("returns 0 when to is before or equal to from", () => {
+    expect(monthsBetween(new Date("2026-03-15T00:00:00Z"), new Date("2026-01-01T00:00:00Z"))).toBe(0);
+    expect(monthsBetween(new Date("2026-03-15T00:00:00Z"), new Date("2026-03-15T00:00:00Z"))).toBe(0);
+  });
+
+  it("crosses a year boundary", () => {
+    expect(monthsBetween(new Date("2025-11-01T00:00:00Z"), new Date("2026-02-01T00:00:00Z"))).toBe(3);
   });
 });

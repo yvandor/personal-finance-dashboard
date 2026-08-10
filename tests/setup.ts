@@ -23,6 +23,10 @@ export async function resetTestData(): Promise<void> {
   // on why that cascade is itself a flagged, not-yet-addressed concern).
   await prisma.budget.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.category.deleteMany({ where: { userId: { in: userIds } } });
+  // Same explicit-not-cascade discipline for goals: contributions before
+  // the goal that owns them.
+  await prisma.savingsContribution.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.savingsGoal.deleteMany({ where: { userId: { in: userIds } } });
 
   // `update` is non-empty and resets every mutable field a test might have
   // touched (e.g. currency) -- an empty `update: {}` would only apply on

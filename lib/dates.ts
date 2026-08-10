@@ -100,3 +100,20 @@ export function shiftMonthKey(monthKey: string, delta: number): string {
   const shifted = addMonths(year, month - 1, delta);
   return `${shifted.year}-${pad2(shifted.month0 + 1)}`;
 }
+
+/**
+ * Whole calendar months from `from` to `to`, floored at 0 (never negative --
+ * a `to` at or before `from` is 0 months, not a negative count). Backs
+ * savings goals' pace-against-a-target-date math (server/data/savingsGoals.ts):
+ * months elapsed since a goal was created, and months remaining until its
+ * target date. A partial month (e.g. 45 days) counts as 1 whole month once
+ * `to`'s day-of-month reaches `from`'s, 0 otherwise -- coarser than exact
+ * day-counting, but matches the granularity every other month-relative
+ * calculation in this app (budgets, dashboard trends) already uses.
+ */
+export function monthsBetween(from: Date, to: Date): number {
+  if (to <= from) return 0;
+  const months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+  const dayAdjust = to.getUTCDate() < from.getUTCDate() ? -1 : 0;
+  return Math.max(months + dayAdjust, 0);
+}
