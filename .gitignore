@@ -50,3 +50,6 @@ next-env.d.ts
 /test-results/
 /blob-report/
 /playwright/.cache/
+
+# agent worktrees (transient, created/removed per session)
+/.claude/worktrees/

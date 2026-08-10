@@ -52,6 +52,9 @@ async function main() {
   // Explicit, not relied-upon-via-cascade -- same discipline as tests/setup.ts.
   await prisma.savingsContribution.deleteMany({ where: { userId: DEV_USER_ID } });
   await prisma.savingsGoal.deleteMany({ where: { userId: DEV_USER_ID } });
+  await prisma.recurringBillPayment.deleteMany({ where: { userId: DEV_USER_ID } });
+  await prisma.recurringBill.deleteMany({ where: { userId: DEV_USER_ID } });
+  await prisma.incomeSource.deleteMany({ where: { userId: DEV_USER_ID } });
 
   await prisma.user.upsert({
     where: { id: DEV_USER_ID },

@@ -13,6 +13,11 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "coverage/**",
+    // Transient per-session agent worktrees -- each is its own git
+    // checkout with a full copy of the tree; linting them from the main
+    // worktree is both redundant (they're linted independently, in their
+    // own process) and noisy while one is still mid-edit.
+    ".claude/worktrees/**",
   ]),
   // Enforces the DAL boundary at build time, not just by convention: only
   // server/data/** (the DAL) may import the Prisma client singleton or

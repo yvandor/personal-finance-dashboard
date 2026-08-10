@@ -44,7 +44,12 @@ test.describe("History", () => {
     await expect(incomeLink).toHaveAttribute("href", new RegExp(`/transactions\\?dateFrom=${thisMonth}-01`));
     await incomeLink.click();
     await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
-    await expect(page.getByText("This month's paycheck")).toBeVisible();
+    // Both the desktop table row and the mobile card list (and each row's
+    // mounted-but-hidden delete-confirm dialog, which interpolates the
+    // description into its own text) are all present in the DOM at once --
+    // same ambiguity class documented in e2e/categories.spec.ts and
+    // e2e/goals.spec.ts. Scope to the table cell specifically.
+    await expect(page.getByRole("cell", { name: "This month's paycheck", exact: true })).toBeVisible();
   });
 
   test("changing the months-back selector widens the range shown", async ({ page }) => {
