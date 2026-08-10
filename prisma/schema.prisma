@@ -51,11 +51,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  categories    Category[]
-  transactions  Transaction[]
-  budgets       Budget[]
-  savingsGoals  SavingsGoal[]
-  contributions SavingsContribution[]
+  categories     Category[]
+  transactions   Transaction[]
+  budgets        Budget[]
+  savingsGoals   SavingsGoal[]
+  contributions  SavingsContribution[]
+  incomeSources  IncomeSource[]
+  recurringBills RecurringBill[]
+  billPayments   RecurringBillPayment[]
 
   @@map("users")
 }
@@ -75,9 +78,10 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  budgets      Budget[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  budgets        Budget[]
+  recurringBills RecurringBill[]
 
   @@unique([userId, type, name])
   @@unique([id, userId]) // target of the composite same-owner FK added in the migration
@@ -97,16 +101,26 @@ model Transaction {
   notes       String? @db.VarChar(1000)
   categoryId  String?
 
+  // Optional link to the expected income source this transaction fulfills
+  // (e.g. a paycheck) -- only meaningful for type = INCOME, never enforced
+  // at the DB level since not every income transaction is tied to a
+  // recurring source. See lib/incomeSources.ts for the expected-vs-received
+  // computation this enables.
+  incomeSourceId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  incomeSource IncomeSource?         @relation(fields: [incomeSourceId], references: [id], onDelete: SetNull)
+  billPayment  RecurringBillPayment?
 
   @@index([userId, date(sort: Desc), id]) // primary list ordering + keyset pagination
   @@index([userId, categoryId, date]) // category filter + per-category rollups
   @@index([userId, type, date]) // income/expense split for monthly summaries
   @@index([userId, amountCents]) // amount-range filter
+  @@index([userId, incomeSourceId, date]) // expected-vs-received income rollup
   @@map("transactions")
 }
 
@@ -170,4 +184,78 @@ model SavingsContribution {
   @@index([goalId, date])
   @@index([userId, date])
   @@map("savings_contributions")
+}
+
+// An expected recurring income (e.g. "Paycheck"). amountCents is a flat
+// expected-per-occurrence amount -- v1.3 does not model variable-amount
+// income (e.g. biweekly pay that differs month to month). payDay is
+// clamped to the last day of short months at read time (lib/dates.ts),
+// never stored pre-clamped, so a source created with payDay=31 still means
+// "end of month" in February.
+model IncomeSource {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @db.VarChar(80)
+  amountCents Int
+  payDay      Int // 1-31
+  isActive    Boolean  @default(true)
+  notes       String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([userId, name])
+  @@index([userId, isActive])
+  @@map("income_sources")
+}
+
+// A recurring monthly bill. Reminder-only by design (see docs/PROJECT_PLAN.md
+// v1.3 notes): this app has no background worker, so nothing auto-posts a
+// transaction on a due date. Paid/unpaid status per month is tracked via the
+// explicit RecurringBillPayment ledger below, not derived from matching
+// transactions -- the same reasoning as SavingsContribution above.
+model RecurringBill {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @db.VarChar(80)
+  amountCents Int
+  categoryId  String? // used only if a payment logs a transaction
+  dueDay      Int // 1-31
+  isActive    Boolean  @default(true)
+  notes       String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  payments RecurringBillPayment[]
+
+  @@unique([userId, name])
+  @@index([userId, isActive, dueDay])
+  @@map("recurring_bills")
+}
+
+// One row per (bill, month) once marked paid. transactionId is set only
+// when the "log a transaction for this" option was used when marking paid
+// -- both writes happen inside one prisma.$transaction (server/data/recurringBills.ts)
+// so a payment row can never exist without its transaction, or vice versa,
+// when that option was chosen.
+model RecurringBillPayment {
+  id            String   @id @default(cuid())
+  userId        String
+  billId        String
+  periodMonth   String   @db.VarChar(7) // "YYYY-MM"
+  paidAt        DateTime @default(now())
+  transactionId String?  @unique
+  createdAt     DateTime @default(now())
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bill        RecurringBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  transaction Transaction?  @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@unique([billId, periodMonth])
+  @@index([userId, periodMonth])
+  @@map("recurring_bill_payments")
 }

@@ -117,3 +117,35 @@ export function monthsBetween(from: Date, to: Date): number {
   const dayAdjust = to.getUTCDate() < from.getUTCDate() ? -1 : 0;
   return Math.max(months + dayAdjust, 0);
 }
+
+/**
+ * Clamps a stored 1-31 day-of-month (IncomeSource.payDay, RecurringBill.dueDay)
+ * to the last real day of `monthKey`'s month -- a value of 31 means "end of
+ * month" everywhere, not "the 31st or bust". Never mutates the stored value;
+ * only the read-time occurrence date is clamped.
+ */
+export function clampDayToMonth(day: number, monthKey: string): number {
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = Number(yearStr);
+  const month0 = Number(monthStr) - 1;
+  return Math.min(day, lastDayOfMonth(year, month0));
+}
+
+/** Ascending "YYYY-MM" keys for the `n` months up to and including `now`'s month -- backs the history view's month range. */
+export function lastNMonths(n: number, now: Date = new Date()): string[] {
+  const year = now.getUTCFullYear();
+  const month0 = now.getUTCMonth();
+  const start = addMonths(year, month0, -(n - 1));
+  const keys: string[] = [];
+  let y = start.year;
+  let m = start.month0;
+  for (let i = 0; i < n; i++) {
+    keys.push(`${y}-${pad2(m + 1)}`);
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+  return keys;
+}

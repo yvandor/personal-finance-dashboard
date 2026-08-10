@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { resolvePeriodRange, monthKeyRange, currentMonthKey, shiftMonthKey, monthsBetween } from "@/lib/dates";
+import {
+  resolvePeriodRange,
+  monthKeyRange,
+  currentMonthKey,
+  shiftMonthKey,
+  monthsBetween,
+  clampDayToMonth,
+  lastNMonths,
+} from "@/lib/dates";
 
 // A fixed reference "now" throughout -- these are relative-period
 // calculations ("current month", "current year"), so every test injects
@@ -103,5 +111,41 @@ describe("monthsBetween", () => {
 
   it("crosses a year boundary", () => {
     expect(monthsBetween(new Date("2025-11-01T00:00:00Z"), new Date("2026-02-01T00:00:00Z"))).toBe(3);
+  });
+});
+
+describe("clampDayToMonth", () => {
+  it("leaves an in-range day untouched", () => {
+    expect(clampDayToMonth(15, "2026-03")).toBe(15);
+  });
+
+  it("clamps day 31 to 30 in a 30-day month", () => {
+    expect(clampDayToMonth(31, "2026-04")).toBe(30);
+  });
+
+  it("clamps day 31 to 28 in a non-leap February", () => {
+    expect(clampDayToMonth(31, "2026-02")).toBe(28);
+  });
+
+  it("clamps day 31 to 29 in a leap February", () => {
+    expect(clampDayToMonth(31, "2028-02")).toBe(29);
+  });
+
+  it("leaves day 31 untouched in a 31-day month", () => {
+    expect(clampDayToMonth(31, "2026-01")).toBe(31);
+  });
+});
+
+describe("lastNMonths", () => {
+  it("returns n ascending month keys ending at now's month", () => {
+    expect(lastNMonths(3, new Date("2026-03-15T00:00:00Z"))).toEqual(["2026-01", "2026-02", "2026-03"]);
+  });
+
+  it("returns a single key for n = 1", () => {
+    expect(lastNMonths(1, new Date("2026-03-15T00:00:00Z"))).toEqual(["2026-03"]);
+  });
+
+  it("crosses a year boundary", () => {
+    expect(lastNMonths(4, new Date("2026-01-31T00:00:00Z"))).toEqual(["2025-10", "2025-11", "2025-12", "2026-01"]);
   });
 });
