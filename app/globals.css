@@ -13,6 +13,18 @@
   --expense: #dc2626;
   --danger: #dc2626;
   --danger-hover: #b91c1c;
+
+  /* iPhone notch/Dynamic Island/home-indicator insets -- only nonzero when
+     this app runs full-bleed under the system UI, which only happens in
+     standalone (Add to Home Screen) mode thanks to `viewport-fit=cover`
+     in app/layout.tsx's viewport export. Falls back to 0px in ordinary
+     Safari tabs and every non-iOS browser, where env() itself is either
+     0 or unsupported. See components/layout/MobileNav.tsx for the one
+     place this matters today (the mobile top bar). */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 @theme inline {
@@ -53,4 +65,30 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Tailwind v4 has no built-in safe-area utilities. These set the raw inset
+   only -- a *second*, separate padding-top declaration from a Tailwind
+   spacing utility (e.g. py-3) does NOT add to this; the cascade just picks
+   whichever rule wins, so stacking `className="py-3 pt-safe"` would silently
+   drop the design's normal 12px whenever the safe area is nonzero, not add
+   to it. A component that needs both the safe-area inset AND its usual
+   padding must combine them in one declaration instead, e.g. Tailwind's
+   arbitrary-value syntax: `pt-[calc(var(--safe-area-top)+0.75rem)]` (see
+   components/layout/MobileNav.tsx). Use the bare .pt-safe/.pb-safe/etc.
+   classes below only where the safe-area inset is the ONLY top/bottom/side
+   spacing wanted. */
+@layer utilities {
+  .pt-safe {
+    padding-top: var(--safe-area-top);
+  }
+  .pb-safe {
+    padding-bottom: var(--safe-area-bottom);
+  }
+  .pl-safe {
+    padding-left: var(--safe-area-left);
+  }
+  .pr-safe {
+    padding-right: var(--safe-area-right);
+  }
 }

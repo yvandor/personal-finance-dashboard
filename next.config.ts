@@ -49,6 +49,15 @@ const csp = [
   `frame-ancestors 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
+  // Both of these would already resolve correctly by falling back to
+  // script-src/default-src ('self' either way) if left unset -- stated
+  // explicitly anyway, matching every other directive in this policy,
+  // rather than leaning on an implicit fallback a future edit to
+  // script-src could silently change the meaning of. worker-src governs
+  // the service worker script itself (public/sw.js, v1.4); manifest-src
+  // governs the web app manifest fetch (app/manifest.ts, v1.4).
+  `worker-src 'self'`,
+  `manifest-src 'self'`,
   `upgrade-insecure-requests`,
 ].join("; ");
 

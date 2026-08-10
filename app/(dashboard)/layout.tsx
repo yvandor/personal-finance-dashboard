@@ -26,8 +26,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        {/* Mobile top bar: hamburger opens the full nav in a slide-over drawer */}
-        <header className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
+        {/* Mobile top bar: hamburger opens the full nav in a slide-over drawer.
+            pt-[calc(...)] combines the iPhone notch/Dynamic Island safe-area
+            inset with the header's normal 12px top padding in one
+            declaration -- see app/globals.css's comment on why a separate
+            pt-safe utility can't just be stacked on top of py-3. Only
+            nonzero in standalone (Add to Home Screen) mode; an ordinary
+            Safari tab already reserves this space itself. */}
+        <header className="flex items-center justify-between border-b border-border bg-surface px-4 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)] md:hidden">
           <span className="text-lg font-semibold">Finance</span>
           <MobileNav />
         </header>

@@ -31,6 +31,12 @@ jobs:
     env:
       DATABASE_URL: "postgresql://finance_test:finance_test_ci_password@localhost:5432/finance_test?schema=public"
       DEV_USER_ID: "dev-user"
+      # `next build` forces NODE_ENV=production internally regardless of the
+      # runner's own shell env, which trips server/env.ts's pre-auth
+      # production guard (v1.4) -- CI building successfully is a deliberate,
+      # controlled acknowledgment that this is still a pre-auth build, not a
+      # real deploy. See docs/PROJECT_PLAN.md §8 and server/env.ts's comment.
+      PREAUTH_MODE_ACKNOWLEDGED: "true"
 
     steps:
       - uses: actions/checkout@v4

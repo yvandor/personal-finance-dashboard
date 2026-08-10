@@ -15,6 +15,36 @@ const serverEnvSchema = z.object({
   DEV_USER_ID: z.string().min(1, "DEV_USER_ID is required -- see .env.example and server/context.ts."),
 });
 
+// docs/PROJECT_PLAN.md §8: "the pre-auth build ... must never be deployed to
+// a public host or bound to a non-loopback interface," enforced until now
+// only by documentation, not code. requireUserId() (server/context.ts)
+// resolves every request to one fixed DEV_USER_ID -- fine for local
+// development, an active liability the moment NODE_ENV=production means
+// this process is serving (or being built to serve) real traffic.
+//
+// Checked at BUILD time too, not just runtime: `next build` statically
+// prerenders several routes by actually executing their Server Component
+// code (confirmed empirically -- /bills, /categories, /goals are all
+// prerendered, see README's route table), and Next's CLI forces
+// NODE_ENV=production for that command regardless of the calling shell's
+// own NODE_ENV. A runtime-only check would let a production bundle get
+// built -- and, on some platforms, deployed straight from that build step
+// -- without anyone ever having to acknowledge the gate. This is why CI's
+// `build` step and any local `next build` now both require the escape
+// hatch below; see .github/workflows/ci.yml.
+export function assertNotUnguardedProduction(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  if (process.env.PREAUTH_MODE_ACKNOWLEDGED === "true") return;
+  throw new Error(
+    "Refusing to build or start in production: this app has no authentication yet " +
+      "(every request acts as one fixed user -- see server/context.ts) and must never " +
+      "serve real traffic or real financial data (docs/PROJECT_PLAN.md §8). If this is " +
+      "a deliberate pre-auth deployment you're restricting access to some other way " +
+      "(a private URL, a platform-level password, an IP allowlist), set " +
+      "PREAUTH_MODE_ACKNOWLEDGED=true to proceed anyway.",
+  );
+}
+
 function loadServerEnv() {
   const parsed = serverEnvSchema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
@@ -24,6 +54,7 @@ function loadServerEnv() {
     const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
     throw new Error(`Invalid server environment configuration -- missing or empty: ${missing}.`);
   }
+  assertNotUnguardedProduction();
   return parsed.data;
 }
 
