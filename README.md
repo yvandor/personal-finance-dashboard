@@ -32,9 +32,13 @@ Currently implemented (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 f
 - **Budgets** — per-category monthly targets with live actual-vs-budget progress tracking (create/edit/delete)
 - **Category management** (`/categories`) — create, rename, and archive; archiving hides a category from new entries without touching its transaction/budget history
 - **Savings Goals** (`/goals`) — target amount and (optional) target date, a contribution ledger independent of the transaction ledger, pace-against-target-date (on-track/behind/overdue), and an automatic one-way transition to "achieved" once a contribution reaches the target
-- **Dashboard analytics** (`/dashboard`) — spending-by-category breakdown and monthly cash-flow trend charts (Recharts), plus budget status summary
-- **Optimistic UI** — adding, editing, and deleting a transaction/budget/goal (and creating/renaming/archiving a category) updates the screen immediately, before the server round trip completes, auto-reverting if the real request fails
+- **Income sources** (`/income`) — expected recurring income (e.g. "Paycheck"), optionally tagged onto an actual income transaction, so the dashboard can show expected-vs-received for the month alongside an unattributed-income total for anything left untagged
+- **Recurring bills** (`/bills`) — reminder-only due-date tracking (paid/due-soon/overdue/upcoming); marking one paid optionally logs the matching expense transaction atomically, in one database transaction — nothing is ever auto-posted on a schedule, since this app has no background worker
+- **Month-to-month history** (`/history`) — income, expenses, net, budget adherence, and bills-paid ratio for each of the last N months, with drill-down links into the filtered Transactions/Budgets views for that month
+- **Dashboard analytics** (`/dashboard`) — spending-by-category breakdown and monthly cash-flow trend charts (Recharts), budget and income status summaries, and an upcoming-bills widget
+- **Optimistic UI** — adding, editing, and deleting a transaction/budget/goal/income-source/bill (and creating/renaming/archiving a category) updates the screen immediately, before the server round trip completes, auto-reverting if the real request fails
 - **Undo-on-delete** — deleting a transaction, budget, or goal shows a toast with a few seconds to undo; the real delete is held until the window elapses, so clicking Undo never touches the server at all
+- **Mobile navigation** — a hamburger-triggered slide-over drawer (native `<dialog>`, focus-trapped) gives every route a real path to reach on a phone-sized viewport, not just the post-redirect default
 - **Accessible, resilient forms** — labels tied to inputs, validation errors wired via `aria-describedby`/`aria-invalid`, and a failed submission never discards what you typed
 - **Per-user data isolation by construction** — every query is scoped through a single `requireUserId()` seam; no code path anywhere accepts a `userId` from the client
 
@@ -75,7 +79,9 @@ flowchart TD
 
 **Reads** skip the Server Action layer entirely — a Server Component calls the DAL directly (`await listTransactions(...)`), since there's no client-side fetch to coordinate. **Writes** always go through a Server Action, which parses `FormData`, validates it with the same Zod schema the DAL itself re-checks, and returns an `ActionResult<T>` (`{ ok, data }` or `{ ok: false, error, fieldErrors }`) rather than throwing — consumed client-side via `useActionState`. The DAL (`server/data/**`) is the only place `PrismaClient` is imported, and every exported function opens by calling `requireUserId()` (`server/context.ts`) — there is no function signature anywhere that accepts a `userId` parameter, so there's nothing for a caller to spoof.
 
-**Client-side optimism:** each list page (`/transactions`, `/budgets`, `/goals`, `/categories`) has one client `*Board.tsx` component that owns a `useOptimistic` overlay shared by its header's create dialog and the list below it, threaded down to row-level edit/delete via plain optional callback props (no Context needed at that scale). Deletion additionally routes through a small shared `ToastProvider` (`components/ui/ToastProvider.tsx`) — the one place this app *does* use Context, since a toast is a genuinely cross-page concern — which holds the real delete for a few seconds so clicking Undo never touches the server at all.
+**Client-side optimism:** each list page (`/transactions`, `/budgets`, `/goals`, `/categories`, `/income`, `/bills`) has one client `*Board.tsx` component that owns a `useOptimistic` overlay shared by its header's create dialog and the list below it, threaded down to row-level edit/delete via plain optional callback props (no Context needed at that scale). Deletion additionally routes through a small shared `ToastProvider` (`components/ui/ToastProvider.tsx`) — the one place this app *does* use Context, since a toast is a genuinely cross-page concern — which holds the real delete for a few seconds so clicking Undo never touches the server at all. `/history` is the one list page with no Board: it's read-only, so there's nothing to optimistically update.
+
+**Mobile navigation:** `NAV_ITEMS` (`lib/navigation.ts`) is the single source of truth for both the desktop sidebar (rendered inline in the Server Component `layout.tsx`) and the mobile drawer (`components/layout/MobileNav.tsx`, a Client Component built on the same native-`<dialog>`-plus-`showModal()` pattern as `Modal.tsx`) — one list, so the two surfaces can't drift out of sync.
 
 ### Layers
 
@@ -108,8 +114,8 @@ lib/**               Dependency-free: money math (lib/money.ts), Zod schemas (li
 web/
 ├── app/
 │   ├── (dashboard)/
-│   │   ├── layout.tsx            # sidebar (desktop) / top bar (mobile) shell, mounts ToastProvider
-│   │   ├── transactions/, budgets/, goals/, categories/, dashboard/
+│   │   ├── layout.tsx            # sidebar (desktop) / mobile-drawer-triggering top bar, mounts ToastProvider
+│   │   ├── transactions/, budgets/, goals/, categories/, income/, bills/, history/, dashboard/
 │   │   │   ├── page.tsx          # Server Component: reads searchParams, calls the DAL
 │   │   │   ├── loading.tsx
 │   │   │   └── error.tsx
@@ -121,36 +127,40 @@ web/
 │   ├── context.ts                # requireUserId() — the sole auth seam
 │   ├── env.ts                    # Zod-validated server environment (server-only)
 │   ├── data/                     # DAL — only place `prisma` is imported; ESLint-enforced
-│   │   ├── transactions.ts, budgets.ts, savingsGoals.ts, categories.ts, dashboard.ts, users.ts
+│   │   ├── transactions.ts, budgets.ts, savingsGoals.ts, categories.ts, incomeSources.ts,
+│   │   │   recurringBills.ts, history.ts, dashboard.ts, users.ts
 │   └── actions/                  # 'use server' mutations, one file per resource
 ├── lib/
 │   ├── money.ts                  # parseMoneyToCents / formatCents — the only arithmetic site
 │   ├── result.ts                 # ActionResult<T>
 │   ├── errors.ts                 # NotFoundError / ValidationError
-│   ├── dates.ts                  # month-relative + monthsBetween date math
-│   ├── budgets.ts, savingsGoals.ts, categories.ts, transactions.ts
-│   │                              # pure progress/pace math + optimistic-reducer per resource
+│   ├── dates.ts                  # month-relative + monthsBetween/clampDayToMonth/lastNMonths date math
+│   ├── navigation.ts             # NAV_ITEMS — shared by the desktop sidebar and mobile drawer
+│   ├── budgets.ts, savingsGoals.ts, categories.ts, transactions.ts, incomeSources.ts, recurringBills.ts
+│   │                              # pure progress/pace/status math + optimistic-reducer per resource
 │   └── schemas/                  # Zod: create/update/filter schemas per resource
 ├── components/
 │   ├── ui/                       # Button, Modal, ConfirmDialog, Money, Toast, ToastProvider
-│   └── transactions/, budgets/, goals/, categories/
+│   ├── layout/                   # MobileNav — the slide-over drawer, built on native <dialog>
+│   └── transactions/, budgets/, goals/, categories/, income/, bills/, history/
 │       │                          # form, dialog, row/card, and one *Board.tsx per resource
-│       │                          # (owns the useOptimistic overlay -- see Architecture overview)
+│       │                          # (owns the useOptimistic overlay -- see Architecture overview;
+│       │                          # history/ has no Board -- it's read-only)
 ├── prisma/
 │   ├── schema.prisma
 │   ├── migrations/
 │   └── seed.ts                   # dev user + default categories
 ├── tests/
-│   ├── unit/                     # pure logic (Zod schemas, money/date/progress/pace math, reducers)
+│   ├── unit/                     # pure logic (Zod schemas, money/date/progress/pace/status math, reducers)
 │   │   └── components/           # React Testing Library, one file per component
 │   └── integration/               # real Postgres — CRUD + cross-user isolation, per DAL
-├── e2e/                          # Playwright critical-path specs, one per resource
+├── e2e/                          # Playwright critical-path specs, one per resource, plus mobile-nav.spec.ts
 └── .github/
     ├── workflows/ci.yml
     └── dependabot.yml
 ```
 
-`prisma/schema.prisma` defines `Budget`, `SavingsGoal`, and `SavingsContribution` models — the schema was designed up front for the full product. `Category`, `Transaction`, and `Budget` now have a full DAL, Server Actions, and UI; `SavingsGoal`/`SavingsContribution` still have only the schema (see [Roadmap](#roadmap)).
+`prisma/schema.prisma` now has a full DAL, Server Actions, and UI for every model it defines: `Category`, `Transaction`, `Budget`, `SavingsGoal`/`SavingsContribution`, `IncomeSource`, and `RecurringBill`/`RecurringBillPayment`.
 
 ## Installation
 
@@ -186,7 +196,7 @@ There is no authentication yet (see [Roadmap](#roadmap)). Every request acts as 
 npm run dev
 ```
 
-Visit `http://localhost:3000` — it redirects to `/transactions`. `/dashboard` (analytics) and `/budgets` are also live routes.
+Visit `http://localhost:3000` — it redirects to `/transactions`. `/dashboard`, `/budgets`, `/bills`, `/income`, `/goals`, `/categories`, and `/history` are also live routes.
 
 ## Running tests
 
@@ -202,7 +212,7 @@ tests/
                      No mocking of Prisma — including the cross-user data-isolation suite.
 ```
 
-As of this writing: **398 Vitest tests** (unit + component + integration, via `npm run test`) plus a separate **12-test Playwright E2E suite** (see [End-to-end tests](#end-to-end-tests) below) — 410 automated tests total, all passing in CI on every push (`ci` and `e2e` jobs).
+As of this writing: **620 Vitest tests** (unit + component + integration, via `npm run test`) plus a separate **23-test Playwright E2E suite** (see [End-to-end tests](#end-to-end-tests) below) — 643 automated tests total, all passing in CI on every push (`ci` and `e2e` jobs).
 
 `vitest.config.mts` loads `.env.test` and sets the `react-server` module-resolution condition that `server-only`-guarded files need outside of Next's own bundler. Integration tests wipe and reseed a fixed dev user and a second test user before each test (`tests/setup.ts`) — point `.env.test` at a database that's safe to truncate.
 
@@ -216,7 +226,7 @@ npm run test:coverage
 
 ## End-to-end tests
 
-A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, the dashboard, and dialog accessibility/focus behavior — in a real browser against a real running app.
+A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, income sources (including tagging a transaction and the expected-vs-received number updating), recurring bills (including the atomic mark-paid-and-log-a-transaction flow), month-to-month history, the dashboard, mobile navigation at a real phone-sized viewport, and dialog accessibility/focus behavior — in a real browser against a real running app.
 
 ```bash
 cp .env.e2e.example .env.e2e   # a THIRD database, separate from finance_dev and .env.test's
@@ -278,8 +288,11 @@ Not yet built:
 
 - [ ] **Authentication (Auth.js)** — deliberately sequenced after the core UI; the schema and `requireUserId()` seam were designed for this from the first migration, so this becomes a swap of one function's body plus route protection, not a data-model rewrite
 - [ ] **Structured logging + error tracking**, **cross-user isolation E2E suite**, **rate limiting on mutations** — the production-readiness items sequenced right after auth
+- [ ] **Installable PWA** (manifest + service worker) — the v1.3 mobile-usability pass was deliberately scoped to responsive polish only; installability is a distinct, self-contained slice
 
-**Recently shipped:** Category management (`/categories` — create/rename/archive), Savings Goals (`/goals` — target/pace tracking via a contribution ledger), optimistic UI, and undo-on-delete toasts across transactions/budgets/goals — see [Features](#features) above. Category deletion ships as **archive**, not the originally-planned reassign-or-block flow: archiving already satisfies the AC that a label deletion must never delete financial history, without needing a separate reassignment step, and matches the `isArchived` column's own documented purpose.
+**Recently shipped:** Income sources (`/income` — expected vs. received income tracking), recurring bills (`/bills` — reminder-only due-date tracking with an atomic optional transaction on mark-paid), month-to-month history (`/history`), a mobile navigation drawer, and "copy last month's budgets" on `/budgets` — see [Features](#features) above. Two known, intentional simplifications: `IncomeSource.amountCents` is a flat expected-per-occurrence amount (no support for variable-amount income like differing biweekly paychecks), and a bill's "X of Y" ratio on `/history` compares every historical month against *today's* active bill set, since `RecurringBill` has no record of when a bill became active (the same current-state-only limitation `getCurrentMonthBudgetStatus` already accepted).
+
+Previously shipped: Category management (`/categories` — create/rename/archive), Savings Goals (`/goals` — target/pace tracking via a contribution ledger), optimistic UI, and undo-on-delete toasts across transactions/budgets/goals. Category deletion ships as **archive**, not the originally-planned reassign-or-block flow: archiving already satisfies the AC that a label deletion must never delete financial history, without needing a separate reassignment step, and matches the `isArchived` column's own documented purpose.
 
 ## Future features
 
