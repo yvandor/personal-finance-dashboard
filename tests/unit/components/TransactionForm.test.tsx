@@ -37,6 +37,7 @@ function okResult(data: Partial<TransactionDTO> = {}): ActionResult<TransactionD
       description: "Coffee",
       notes: null,
       categoryId: "cat-groceries",
+      incomeSourceId: null,
       createdAt: "2026-03-15T00:00:00.000Z",
       updatedAt: "2026-03-15T00:00:00.000Z",
       ...data,
@@ -159,6 +160,7 @@ describe("TransactionForm", () => {
       description: "Rent",
       notes: null,
       categoryId: "cat-groceries",
+      incomeSourceId: null,
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",
     };

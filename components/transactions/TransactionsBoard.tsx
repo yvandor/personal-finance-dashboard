@@ -9,10 +9,18 @@ import { TransactionList } from "./TransactionList";
 import { Pager, type PagerProps } from "./Pager";
 import type { TransactionDTO, TransactionsSummary } from "@/server/data/transactions";
 import type { CategoryDTO } from "@/server/data/categories";
+import type { IncomeSourceDTO } from "@/server/data/incomeSources";
 
 interface TransactionsBoardProps {
   transactions: TransactionDTO[];
   categories: CategoryDTO[];
+  /**
+   * Active income sources, for the header's "Add transaction" dialog's
+   * Source picker -- see TransactionForm.tsx's comment on this same prop.
+   * Only threaded to that one create dialog, not to each row's edit
+   * dialog (owned by TransactionList.tsx, outside this version's scope).
+   */
+  incomeSources?: IncomeSourceDTO[];
   currency?: string;
   hasActiveFilters: boolean;
   summary: TransactionsSummary;
@@ -35,6 +43,7 @@ const PRIMARY_BUTTON_CLASSES =
 export function TransactionsBoard({
   transactions,
   categories,
+  incomeSources,
   currency,
   hasActiveFilters,
   summary,
@@ -72,6 +81,7 @@ export function TransactionsBoard({
         <TransactionFormDialog
           mode="create"
           categories={categories}
+          incomeSources={incomeSources}
           triggerClassName={PRIMARY_BUTTON_CLASSES}
           onOptimisticAdd={
             isDefaultView

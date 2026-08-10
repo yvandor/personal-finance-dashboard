@@ -5,11 +5,14 @@ import { Modal } from "@/components/ui/Modal";
 import { TransactionForm } from "./TransactionForm";
 import type { TransactionDTO } from "@/server/data/transactions";
 import type { CategoryDTO } from "@/server/data/categories";
+import type { IncomeSourceDTO } from "@/server/data/incomeSources";
 
 interface TransactionFormDialogProps {
   mode: "create" | "edit";
   transaction?: TransactionDTO;
   categories: CategoryDTO[];
+  /** Optional -- see TransactionForm.tsx's comment on this same prop. */
+  incomeSources?: IncomeSourceDTO[];
   /** Rendered as the trigger button's content (text or an icon), not cloned. */
   children: ReactNode;
   triggerClassName?: string;
@@ -22,6 +25,7 @@ export function TransactionFormDialog({
   mode,
   transaction,
   categories,
+  incomeSources,
   children,
   triggerClassName,
   triggerAriaLabel,
@@ -56,6 +60,7 @@ export function TransactionFormDialog({
           mode={mode}
           transaction={transaction}
           categories={categories}
+          incomeSources={incomeSources}
           onSuccess={() => setOpen(false)}
           onOptimisticAdd={onOptimisticAdd}
           onOptimisticUpdate={onOptimisticUpdate}

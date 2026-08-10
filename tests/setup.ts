@@ -32,6 +32,9 @@ export async function resetTestData(): Promise<void> {
   // here for the same reason as budgets/goals above.
   await prisma.recurringBillPayment.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.recurringBill.deleteMany({ where: { userId: { in: userIds } } });
+  // Transaction.incomeSourceId is onDelete: SetNull, not Cascade, and
+  // transactions are already wiped above -- explicit, not relied-upon,
+  // same discipline as every other owned table here.
   await prisma.incomeSource.deleteMany({ where: { userId: { in: userIds } } });
 
   // `update` is non-empty and resets every mutable field a test might have
@@ -58,4 +61,17 @@ export async function resetTestData(): Promise<void> {
 // Tests for createCategory itself live in tests/integration/categories.test.ts.
 export function createTestCategory(userId: string, type: CategoryType, name: string) {
   return prisma.category.create({ data: { userId, type, name } });
+}
+
+// Same reasoning as createTestCategory above: most income-vs-expected tests
+// just need a source to exist, not to also exercise (and depend on)
+// createIncomeSource's own validation. Tests for createIncomeSource itself
+// live in tests/integration/income-sources.test.ts.
+export function createTestIncomeSource(
+  userId: string,
+  name: string,
+  amountCents: number,
+  payDay: number,
+) {
+  return prisma.incomeSource.create({ data: { userId, name, amountCents, payDay } });
 }

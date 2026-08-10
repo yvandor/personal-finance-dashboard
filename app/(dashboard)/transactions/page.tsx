@@ -1,5 +1,6 @@
 import { listTransactions, getTransactionsSummary } from "@/server/data/transactions";
 import { listCategories } from "@/server/data/categories";
+import { listIncomeSources } from "@/server/data/incomeSources";
 import { getCurrentUserCurrency } from "@/server/data/users";
 import { transactionFilterSchema } from "@/lib/schemas/transaction";
 import { TransactionsBoard } from "@/components/transactions/TransactionsBoard";
@@ -48,9 +49,10 @@ export default async function TransactionsPage({
   // shifted window that a client-side insert can't reliably place into.
   const isDefaultView = !hasActiveFilters && !filters.cursor;
 
-  const [categories, currency, { items, total, hasNext, hasPrev, nextCursor, prevCursor }, summary] =
+  const [categories, incomeSources, currency, { items, total, hasNext, hasPrev, nextCursor, prevCursor }, summary] =
     await Promise.all([
       listCategories(),
+      listIncomeSources({ isActive: true }),
       getCurrentUserCurrency(),
       listTransactions(rawFilters),
       getTransactionsSummary(rawFilters),
@@ -61,6 +63,7 @@ export default async function TransactionsPage({
       <TransactionsBoard
         transactions={items}
         categories={categories}
+        incomeSources={incomeSources}
         currency={currency}
         hasActiveFilters={hasActiveFilters}
         summary={summary}
