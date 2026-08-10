@@ -1,0 +1,194 @@
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { prisma } from "@/server/db";
+import { requireUserId } from "@/server/context";
+import { createTransaction } from "@/server/data/transactions";
+import {
+  createCategory,
+  updateCategory,
+  archiveCategory,
+  unarchiveCategory,
+  listCategories,
+  listCategoriesForManagement,
+} from "@/server/data/categories";
+import { NotFoundError, ValidationError } from "@/lib/errors";
+import { DEV_USER_ID, OTHER_USER_ID, createTestCategory, resetTestData } from "../setup";
+
+// Same mocking approach as tests/integration/budgets.test.ts.
+vi.mock("@/server/context", () => ({
+  requireUserId: vi.fn(),
+}));
+
+function actAs(userId: string) {
+  vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+const NONEXISTENT_ID = "clh3ans2z0000356ub9pu9q0m";
+
+describe("categories DAL", () => {
+  beforeEach(async () => {
+    await resetTestData();
+    actAs(DEV_USER_ID);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  describe("createCategory", () => {
+    it("creates a category with the default color", async () => {
+      const category = await createCategory({ name: "Groceries", type: "EXPENSE" });
+      expect(category.name).toBe("Groceries");
+      expect(category.type).toBe("EXPENSE");
+      expect(category.color).toBe("#64748b");
+    });
+
+    it("creates a category with an explicit color", async () => {
+      const category = await createCategory({ name: "Salary", type: "INCOME", color: "#22c55e" });
+      expect(category.color).toBe("#22c55e");
+    });
+
+    it("prevents a duplicate name for the same type", async () => {
+      await createCategory({ name: "Groceries", type: "EXPENSE" });
+      await expect(createCategory({ name: "Groceries", type: "EXPENSE" })).rejects.toThrow(ValidationError);
+    });
+
+    it("allows the same name across different types", async () => {
+      await createCategory({ name: "Other", type: "EXPENSE" });
+      const income = await createCategory({ name: "Other", type: "INCOME" });
+      expect(income.type).toBe("INCOME");
+    });
+
+    it("scopes the duplicate-name check to the current user", async () => {
+      await createTestCategory(OTHER_USER_ID, "EXPENSE", "Groceries");
+      const created = await createCategory({ name: "Groceries", type: "EXPENSE" });
+      expect(created.name).toBe("Groceries");
+    });
+
+    it("rejects an unknown extra field (mass-assignment guard)", async () => {
+      await expect(
+        createCategory({ name: "Groceries", type: "EXPENSE", userId: "someone-else" }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("updateCategory", () => {
+    it("renames a category", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      const updated = await updateCategory(cat.id, { name: "Food & Groceries" });
+      expect(updated.name).toBe("Food & Groceries");
+      expect(updated.type).toBe("EXPENSE"); // untouched
+    });
+
+    it("recolors a category", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      const updated = await updateCategory(cat.id, { color: "#f97316" });
+      expect(updated.color).toBe("#f97316");
+    });
+
+    it("throws NotFoundError updating a nonexistent category", async () => {
+      await expect(updateCategory(NONEXISTENT_ID, { name: "x" })).rejects.toThrow(NotFoundError);
+    });
+
+    it("cannot update another user's category, and the row is unmodified", async () => {
+      const theirs = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      await expect(updateCategory(theirs.id, { name: "Renamed" })).rejects.toThrow(NotFoundError);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.category.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.name).toBe("Theirs");
+    });
+
+    it("rejects renaming to a name already used by another of the user's categories of the same type", async () => {
+      await createTestCategory(DEV_USER_ID, "EXPENSE", "Dining Out");
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await expect(updateCategory(cat.id, { name: "Dining Out" })).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe("archiveCategory / unarchiveCategory", () => {
+    it("archives a category", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await archiveCategory(cat.id);
+      const row = await prisma.category.findUnique({ where: { id: cat.id } });
+      expect(row?.isArchived).toBe(true);
+    });
+
+    it("removes an archived category from listCategories (the picker feed)", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await archiveCategory(cat.id);
+      const active = await listCategories();
+      expect(active.find((c) => c.id === cat.id)).toBeUndefined();
+    });
+
+    it("keeps an in-use category's transactions intact after archiving", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await createTransaction({
+        type: "EXPENSE",
+        amountCents: 1000,
+        date: "2026-01-15",
+        description: "Big shop",
+        categoryId: cat.id,
+      });
+      await archiveCategory(cat.id);
+      const tx = await prisma.transaction.findFirst({ where: { categoryId: cat.id } });
+      expect(tx).not.toBeNull();
+      expect(tx?.categoryId).toBe(cat.id);
+    });
+
+    it("unarchives a category, restoring it to listCategories", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await archiveCategory(cat.id);
+      await unarchiveCategory(cat.id);
+      const active = await listCategories();
+      expect(active.find((c) => c.id === cat.id)).toBeDefined();
+    });
+
+    it("throws NotFoundError archiving a nonexistent category", async () => {
+      await expect(archiveCategory(NONEXISTENT_ID)).rejects.toThrow(NotFoundError);
+    });
+
+    it("cannot archive another user's category", async () => {
+      const theirs = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      await expect(archiveCategory(theirs.id)).rejects.toThrow(NotFoundError);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.category.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.isArchived).toBe(false);
+    });
+  });
+
+  describe("listCategoriesForManagement", () => {
+    it("includes archived categories, unlike listCategories", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await archiveCategory(cat.id);
+      const all = await listCategoriesForManagement();
+      expect(all.find((c) => c.id === cat.id)?.isArchived).toBe(true);
+    });
+
+    it("reports an accurate transaction count", async () => {
+      const cat = await createTestCategory(DEV_USER_ID, "EXPENSE", "Groceries");
+      await createTransaction({
+        type: "EXPENSE",
+        amountCents: 500,
+        date: "2026-01-05",
+        description: "Snacks",
+        categoryId: cat.id,
+      });
+      await createTransaction({
+        type: "EXPENSE",
+        amountCents: 700,
+        date: "2026-01-10",
+        description: "More snacks",
+        categoryId: cat.id,
+      });
+      const all = await listCategoriesForManagement();
+      expect(all.find((c) => c.id === cat.id)?.transactionCount).toBe(2);
+    });
+
+    it("never includes another user's categories", async () => {
+      await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      const mine = await listCategoriesForManagement();
+      expect(mine.find((c) => c.name === "Theirs")).toBeUndefined();
+    });
+  });
+});

@@ -42,8 +42,10 @@ export async function resetTestData(): Promise<void> {
 }
 
 // Test fixtures create categories directly through Prisma rather than
-// through app code — Category CRUD isn't built yet (that's a later phase),
-// so this is the test's own setup, not a shortcut around real app logic.
+// through server/data/categories.ts's createCategory -- most tests just
+// need a category to exist and shouldn't also be exercising (and
+// incidentally depending on) category-creation logic to set that up.
+// Tests for createCategory itself live in tests/integration/categories.test.ts.
 export function createTestCategory(userId: string, type: CategoryType, name: string) {
   return prisma.category.create({ data: { userId, type, name } });
 }
