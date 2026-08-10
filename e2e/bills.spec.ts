@@ -55,8 +55,10 @@ test.describe("Recurring Bills critical path", () => {
     await expect(table.getByRole("cell", { name: "Home Internet", exact: true })).toBeVisible();
     await expect(table.getByText("-$59.99")).toBeVisible();
 
-    // Archive
-    await page.getByRole("link", { name: "Bills" }).click();
+    // Archive -- direct navigation, not a sidebar click: app/(dashboard)/layout.tsx
+    // has no "Bills" nav entry yet (out of this slice's owned files; wired
+    // in during the mobile-nav integration pass).
+    await page.goto("/bills");
     await page.getByRole("button", { name: "Archive Home Internet" }).click();
     const confirmDialog = page.getByRole("dialog", { name: "Archive bill?" });
     await expect(confirmDialog).toBeVisible();
@@ -93,8 +95,13 @@ test.describe("Recurring Bills critical path", () => {
 
     await expect(page.getByText("Paid").first()).toBeVisible();
 
-    // No transaction was created for it.
+    // No transaction was created for it. Wait for the Transactions page's
+    // own heading before asserting absence -- without a sync barrier here,
+    // a bare getByText can still catch the outgoing /bills page's own
+    // "Streaming" bill row mid-navigation (a real, observed flake, not
+    // hypothetical).
     await page.getByRole("link", { name: "Transactions" }).click();
+    await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
     await expect(page.getByText("Streaming")).not.toBeVisible();
   });
 });
