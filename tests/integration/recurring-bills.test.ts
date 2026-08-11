@@ -9,6 +9,12 @@ import {
   markBillPaid,
   listRecurringBills,
 } from "@/server/data/recurringBills";
+import {
+  createRecurringBillAction,
+  updateRecurringBillAction,
+  archiveRecurringBillAction,
+  markBillPaidAction,
+} from "@/server/actions/recurringBills";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { DEV_USER_ID, OTHER_USER_ID, createTestCategory, resetTestData } from "../setup";
 
@@ -17,8 +23,23 @@ vi.mock("@/server/context", () => ({
   requireUserId: vi.fn(),
 }));
 
+// revalidatePath depends on Next's request-scoped internals, which don't
+// exist when calling a Server Action directly under Vitest -- same as
+// tests/integration/transaction-actions.test.ts.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 function actAs(userId: string) {
   vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+function formData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
 }
 
 const NONEXISTENT_ID = "clh3ans2z0000356ub9pu9q0m";
@@ -339,6 +360,77 @@ describe("recurring bills DAL", () => {
 
       const payments = await prisma.recurringBillPayment.count({ where: { billId: theirs.id } });
       expect(payments).toBe(0);
+    });
+  });
+
+  // Server-Action-level adversarial coverage: proves a forged id/categoryId
+  // in FormData sent through server/actions/recurringBills.ts never reaches
+  // another user's row, mirroring
+  // tests/integration/transaction-actions.test.ts's approach one layer
+  // above the DAL-level tests above.
+  describe("recurring bill Server Actions", () => {
+    it("rejects createRecurringBillAction with a categoryId belonging to another user", async () => {
+      const otherCategory = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Not yours");
+      const result = await createRecurringBillAction(
+        null,
+        formData({ name: "Sneaky Bill", amount: "50.00", dueDay: "5", categoryId: otherCategory.id }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+    });
+
+    it("cannot update another user's bill via updateRecurringBillAction, and the row is unmodified", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createRecurringBill({ name: "Their Rent", amountCents: 150000, dueDay: 1 });
+
+      actAs(DEV_USER_ID);
+      const result = await updateRecurringBillAction(
+        theirs.id,
+        null,
+        formData({ name: "Hacked", amount: "1.00", dueDay: "1" }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.recurringBill.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.name).toBe("Their Rent");
+    });
+
+    it("cannot archive another user's bill via archiveRecurringBillAction", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createRecurringBill({ name: "Their Rent", amountCents: 150000, dueDay: 1 });
+
+      actAs(DEV_USER_ID);
+      const result = await archiveRecurringBillAction(theirs.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.recurringBill.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.isActive).toBe(true);
+    });
+
+    it("cannot mark another user's bill paid via markBillPaidAction, and no payment is created", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createRecurringBill({ name: "Their Rent", amountCents: 150000, dueDay: 1 });
+
+      actAs(DEV_USER_ID);
+      const result = await markBillPaidAction(
+        theirs.id,
+        null,
+        formData({ periodMonth: "2026-03", logTransaction: "false" }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      const payments = await prisma.recurringBillPayment.findMany({ where: { billId: theirs.id } });
+      expect(payments).toHaveLength(0);
     });
   });
 });

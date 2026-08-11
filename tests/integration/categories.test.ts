@@ -10,6 +10,11 @@ import {
   listCategories,
   listCategoriesForManagement,
 } from "@/server/data/categories";
+import {
+  updateCategoryAction,
+  archiveCategoryAction,
+  unarchiveCategoryAction,
+} from "@/server/actions/categories";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { DEV_USER_ID, OTHER_USER_ID, createTestCategory, resetTestData } from "../setup";
 
@@ -18,8 +23,23 @@ vi.mock("@/server/context", () => ({
   requireUserId: vi.fn(),
 }));
 
+// revalidatePath depends on Next's request-scoped internals, which don't
+// exist when calling a Server Action directly under Vitest -- same as
+// tests/integration/transaction-actions.test.ts.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 function actAs(userId: string) {
   vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+function formData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
 }
 
 const NONEXISTENT_ID = "clh3ans2z0000356ub9pu9q0m";
@@ -189,6 +209,48 @@ describe("categories DAL", () => {
       await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
       const mine = await listCategoriesForManagement();
       expect(mine.find((c) => c.name === "Theirs")).toBeUndefined();
+    });
+  });
+
+  // Server-Action-level adversarial coverage: proves a forged id in
+  // FormData sent through server/actions/categories.ts never reaches
+  // another user's row, mirroring
+  // tests/integration/transaction-actions.test.ts's approach one layer
+  // above the DAL-level tests above.
+  describe("category Server Actions", () => {
+    it("cannot update another user's category via updateCategoryAction, and the row is unmodified", async () => {
+      const theirs = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      const result = await updateCategoryAction(theirs.id, null, formData({ name: "Renamed" }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.category.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.name).toBe("Theirs");
+    });
+
+    it("cannot archive another user's category via archiveCategoryAction", async () => {
+      const theirs = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      const result = await archiveCategoryAction(theirs.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.category.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.isArchived).toBe(false);
+    });
+
+    it("cannot unarchive another user's category via unarchiveCategoryAction", async () => {
+      const theirs = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      await prisma.category.update({ where: { id: theirs.id }, data: { isArchived: true } });
+
+      const result = await unarchiveCategoryAction(theirs.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.category.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.isArchived).toBe(true);
     });
   });
 });

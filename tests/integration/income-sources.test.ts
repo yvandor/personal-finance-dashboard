@@ -11,6 +11,10 @@ import {
   listIncomeSourcesForManagement,
   getIncomeVsExpected,
 } from "@/server/data/incomeSources";
+import {
+  updateIncomeSourceAction,
+  archiveIncomeSourceAction,
+} from "@/server/actions/incomeSources";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { currentMonthKey } from "@/lib/dates";
 import {
@@ -27,8 +31,23 @@ vi.mock("@/server/context", () => ({
   requireUserId: vi.fn(),
 }));
 
+// revalidatePath depends on Next's request-scoped internals, which don't
+// exist when calling a Server Action directly under Vitest -- same as
+// tests/integration/transaction-actions.test.ts.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 function actAs(userId: string) {
   vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+function formData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
 }
 
 const NONEXISTENT_ID = "clh3ans2z0000356ub9pu9q0m";
@@ -530,6 +549,40 @@ describe("transactions DAL income source linking", () => {
         categoryId: cat.id,
       });
       await expect(updateTransaction(tx.id, { incomeSourceId: otherSource.id })).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  // Server-Action-level adversarial coverage: proves a forged id in
+  // FormData sent through server/actions/incomeSources.ts never reaches
+  // another user's row, mirroring
+  // tests/integration/transaction-actions.test.ts's approach one layer
+  // above the DAL-level tests above.
+  describe("income source Server Actions", () => {
+    it("cannot update another user's income source via updateIncomeSourceAction, and the row is unmodified", async () => {
+      const theirs = await createTestIncomeSource(OTHER_USER_ID, "Their Paycheck", 100000, 1);
+      const result = await updateIncomeSourceAction(
+        theirs.id,
+        null,
+        formData({ name: "Renamed", amount: "999.00", payDay: "5" }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.incomeSource.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.name).toBe("Their Paycheck");
+    });
+
+    it("cannot archive another user's income source via archiveIncomeSourceAction", async () => {
+      const theirs = await createTestIncomeSource(OTHER_USER_ID, "Their Paycheck", 100000, 1);
+      const result = await archiveIncomeSourceAction(theirs.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.incomeSource.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.isActive).toBe(true);
     });
   });
 });

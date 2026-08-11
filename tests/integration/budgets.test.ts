@@ -11,6 +11,7 @@ import {
   copyBudgetsFromMonth,
 } from "@/server/data/budgets";
 import { archiveCategory } from "@/server/data/categories";
+import { createBudgetAction, updateBudgetAction, deleteBudgetAction } from "@/server/actions/budgets";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { currentMonthKey } from "@/lib/dates";
 import { DEV_USER_ID, OTHER_USER_ID, createTestCategory, resetTestData } from "../setup";
@@ -20,8 +21,23 @@ vi.mock("@/server/context", () => ({
   requireUserId: vi.fn(),
 }));
 
+// revalidatePath depends on Next's request-scoped internals, which don't
+// exist when calling a Server Action directly under Vitest -- same as
+// tests/integration/transaction-actions.test.ts.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 function actAs(userId: string) {
   vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+function formData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
 }
 
 // Budgets are month-relative, so every date used here is computed from
@@ -422,6 +438,57 @@ describe("budgets DAL", () => {
       actAs(DEV_USER_ID);
       const result = await copyBudgetsFromMonth({ fromMonth: lastMonth, toMonth: thisMonth });
       expect(result).toEqual({ copiedCount: 0, skippedCount: 0 });
+    });
+  });
+
+  // Server-Action-level adversarial coverage: the DAL-level tests above
+  // exercise cross-user isolation by mocking requireUserId() directly. These
+  // go one layer further out -- through the actual FormData-accepting
+  // Server Actions in server/actions/budgets.ts -- to prove a forged
+  // id/categoryId in form input never reaches a real row belonging to
+  // another user, and never crashes instead of returning a clean
+  // ActionResult. Same pattern as tests/integration/transaction-actions.test.ts.
+  describe("budget Server Actions", () => {
+    it("rejects createBudgetAction with a categoryId belonging to another user", async () => {
+      const otherCat = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Not yours");
+      const result = await createBudgetAction(
+        null,
+        formData({ categoryId: otherCat.id, month: thisMonth, amount: "100.00" }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+    });
+
+    it("cannot update another user's budget via updateBudgetAction, and the row is unmodified", async () => {
+      const otherCat = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      actAs(OTHER_USER_ID);
+      const otherBudget = await createBudget({ categoryId: otherCat.id, month: thisMonth, amountCents: 10000 });
+
+      actAs(DEV_USER_ID);
+      const result = await updateBudgetAction(otherBudget.id, null, formData({ amount: "999.00" }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.budget.findUnique({ where: { id: otherBudget.id } });
+      expect(stillThere?.amountCents).toBe(10000);
+    });
+
+    it("cannot delete another user's budget via deleteBudgetAction", async () => {
+      const otherCat = await createTestCategory(OTHER_USER_ID, "EXPENSE", "Theirs");
+      actAs(OTHER_USER_ID);
+      const otherBudget = await createBudget({ categoryId: otherCat.id, month: thisMonth, amountCents: 10000 });
+
+      actAs(DEV_USER_ID);
+      const result = await deleteBudgetAction(otherBudget.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      expect(await prisma.budget.findUnique({ where: { id: otherBudget.id } })).not.toBeNull();
     });
   });
 });
