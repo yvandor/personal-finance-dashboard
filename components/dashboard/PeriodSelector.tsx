@@ -35,7 +35,7 @@ export function PeriodSelector({ period }: { period: DashboardPeriod }) {
         id="dashboard-period"
         value={period}
         onChange={(e) => handleChange(e.target.value)}
-        className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-accent focus:outline-none"
+        className="rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
       >
         {PERIOD_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

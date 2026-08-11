@@ -9,6 +9,35 @@ interface ModalProps {
   children: ReactNode;
 }
 
+// Module-level count of currently-open Modal instances, not per-instance
+// state -- several dialogs are always mounted at once (one per row's
+// edit/delete, plus the header's add; see TransactionList's comment on
+// rendering both the desktop table and mobile card list simultaneously),
+// but at most one is ever actually open. A shared counter lets each
+// instance's own open/close transition safely increment/decrement without
+// one instance's cleanup clobbering another's still-needed lock.
+//
+// This exists because showModal()'s native top-layer/::backdrop behavior
+// was verified (not assumed) to NOT stop a wheel-scroll gesture from
+// scrolling the page underneath an open dialog in Chromium -- caught by
+// e2e/mobile-audit.spec.ts's scroll-lock test actually failing on its
+// first real run, not by reasoning about the spec in the abstract.
+let openModalCount = 0;
+
+function lockBodyScroll(): void {
+  if (openModalCount === 0) {
+    document.body.style.overflow = "hidden";
+  }
+  openModalCount += 1;
+}
+
+function unlockBodyScroll(): void {
+  openModalCount = Math.max(openModalCount - 1, 0);
+  if (openModalCount === 0) {
+    document.body.style.overflow = "";
+  }
+}
+
 // Built on the native <dialog> element rather than a hand-rolled overlay:
 // showModal() gives focus trapping and top-layer stacking for free, and the
 // browser fires a "cancel" event on Escape, which we treat the same as
@@ -27,10 +56,38 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     if (!dialog) return;
     if (open && !dialog.open) {
       dialog.showModal();
+      lockBodyScroll();
     } else if (!open && dialog.open) {
       dialog.close();
+      // unlockBodyScroll() is NOT called here -- see the dedicated "close"
+      // listener below, which is the single code path for the unlock
+      // regardless of whether the dialog closed programmatically (this
+      // branch) or natively (Escape, or a backdrop click's onClick handler
+      // below, which only calls onClose and relies on this same effect to
+      // actually call dialog.close()). dialog.close() dispatches "close"
+      // either way, so routing the unlock through that one listener avoids
+      // needing to duplicate this logic across every closing path.
     }
   }, [open]);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    const handleNativeClose = () => unlockBodyScroll();
+    dialog.addEventListener("close", handleNativeClose);
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      // If this instance unmounts (e.g. a client-side navigation) while
+      // still open, its own "close" event will never fire -- release the
+      // lock here too so a lingering mount doesn't leave scrolling
+      // disabled forever. Safe to call unconditionally: unlockBodyScroll()
+      // floors the counter at 0 rather than going negative if the dialog
+      // already closed normally first.
+      if (dialog.open) {
+        unlockBodyScroll();
+      }
+    };
+  }, []);
 
   return (
     <dialog
