@@ -65,7 +65,7 @@ export function BillRow({ bill, categories, periodMonth, currency, onOptimisticU
             mode="edit"
             bill={bill}
             categories={categories}
-            triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit ${bill.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

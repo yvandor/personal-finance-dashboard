@@ -33,7 +33,7 @@ export function CategoryRow({ category, onOptimisticUpdate }: CategoryRowProps) 
           <CategoryFormDialog
             mode="edit"
             category={category}
-            triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit ${category.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

@@ -28,7 +28,7 @@ export function BudgetCard({ budget, currency, onOptimisticAdd, onOptimisticUpda
             mode="edit"
             budget={budget}
             month={budget.month}
-            triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit budget for ${budget.categoryName}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

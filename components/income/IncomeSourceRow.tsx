@@ -35,7 +35,7 @@ export function IncomeSourceRow({ incomeSource, currency, onOptimisticUpdate }: 
           <IncomeSourceFormDialog
             mode="edit"
             incomeSource={incomeSource}
-            triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
             triggerAriaLabel={`Edit ${incomeSource.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

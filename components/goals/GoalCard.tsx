@@ -97,7 +97,7 @@ export function GoalCard({
         <GoalFormDialog
           mode="edit"
           goal={goal}
-          triggerClassName="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-accent"
+          triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
           triggerAriaLabel={`Edit ${goal.name}`}
           onOptimisticUpdate={onOptimisticUpdate}
         >
