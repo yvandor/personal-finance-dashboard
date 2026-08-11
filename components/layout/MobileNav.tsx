@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NAV_ITEMS } from "@/lib/navigation";
 
 // Built on the native <dialog> element, same reasoning as components/ui/Modal.tsx:
@@ -16,7 +16,20 @@ import { NAV_ITEMS } from "@/lib/navigation";
 // label with no way to reach any route except Transactions (the
 // post-"/"-redirect default) by typing a URL directly -- see the v1.3
 // mobile-usability review. This is the fix.
-export function MobileNav() {
+interface MobileNavProps {
+  // Rendered output, not a component reference: SignOutButton
+  // (components/auth/SignOutButton.tsx) is a Server Component that imports
+  // server/auth.ts, which is guarded by "server-only". Importing it
+  // directly from this "use client" module would pull that server-only
+  // code into the client bundle and crash it. The caller (a Server
+  // Component -- app/(dashboard)/layout.tsx) renders <SignOutButton />
+  // itself and passes the already-rendered element down, the documented
+  // "Server Components as props to Client Components" pattern (Next.js
+  // docs, server-and-client-components#interleaving-server-and-client-components).
+  signOutSlot?: ReactNode;
+}
+
+export function MobileNav({ signOutSlot }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -64,7 +77,7 @@ export function MobileNav() {
           if (e.target === dialogRef.current) setOpen(false);
         }}
         aria-label="Navigation menu"
-        className="m-0 h-dvh max-h-dvh w-72 max-w-[80vw] border-none bg-surface p-0 text-foreground backdrop:bg-black/50"
+        className="m-0 flex h-dvh max-h-dvh w-72 max-w-[80vw] flex-col border-none bg-surface p-0 text-foreground backdrop:bg-black/50"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <span className="text-lg font-semibold">Finance</span>
@@ -96,6 +109,7 @@ export function MobileNav() {
             );
           })}
         </nav>
+        {signOutSlot && <div className="mt-auto border-t border-border p-3">{signOutSlot}</div>}
       </dialog>
     </>
   );

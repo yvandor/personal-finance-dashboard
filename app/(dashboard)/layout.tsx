@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NAV_ITEMS } from "@/lib/navigation";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -13,7 +14,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="px-5 py-5">
             <span className="text-lg font-semibold">Finance</span>
           </div>
-          <nav className="flex flex-col gap-1 px-3">
+          <nav className="flex flex-1 flex-col gap-1 px-3">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
@@ -24,6 +25,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
+          <div className="border-t border-border px-3 py-3">
+            <SignOutButton className="text-muted" />
+          </div>
         </aside>
 
         {/* Mobile top bar: hamburger opens the full nav in a slide-over drawer.
@@ -35,7 +39,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             Safari tab already reserves this space itself. */}
         <header className="flex items-center justify-between border-b border-border bg-surface px-4 pb-3 pt-[calc(var(--safe-area-top)+0.75rem)] md:hidden">
           <span className="text-lg font-semibold">Finance</span>
-          <MobileNav />
+          <MobileNav signOutSlot={<SignOutButton className="text-muted" />} />
         </header>
 
         <main className="min-w-0 flex-1">{children}</main>
