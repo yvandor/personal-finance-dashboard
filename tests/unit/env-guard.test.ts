@@ -1,40 +1,86 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { assertNotUnguardedProduction } from "@/server/env";
+import { assertProductionAuthConfigured } from "@/server/env";
 
-// Exercises the pre-auth production guard as a standalone function call
-// against stubbed process.env, not by re-triggering server/env.ts's own
+// Exercises the production auth guard as a standalone function call against
+// stubbed process.env, not by re-triggering server/env.ts's own
 // module-level `loadServerEnv()` -- that already ran once at first import
 // (using this test run's real env, where NODE_ENV="test") and its result is
 // cached in the exported `serverEnv`, same as every other test file that
 // transitively imports server/env.ts. vi.stubEnv (not direct assignment) --
 // process.env.NODE_ENV is typed read-only by @types/node, and stubEnv is
 // the Vitest-native way to override it safely per test.
-describe("assertNotUnguardedProduction", () => {
+const ALL_REQUIRED = {
+  AUTH_SECRET: "test-secret",
+  AUTH_GITHUB_ID: "test-github-id",
+  AUTH_GITHUB_SECRET: "test-github-secret",
+  ALLOWED_SIGNIN_EMAILS: "owner@example.com",
+};
+
+function stubAll(vars: Partial<Record<keyof typeof ALL_REQUIRED, string>>) {
+  for (const [key, value] of Object.entries(ALL_REQUIRED)) {
+    vi.stubEnv(key, key in vars ? (vars as Record<string, string>)[key] : value);
+  }
+}
+
+describe("assertProductionAuthConfigured", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("does not throw outside production, regardless of the acknowledgment", () => {
+  it("does not throw outside production, regardless of auth configuration", () => {
     vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("PREAUTH_MODE_ACKNOWLEDGED", "");
-    expect(() => assertNotUnguardedProduction()).not.toThrow();
+    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "", ALLOWED_SIGNIN_EMAILS: "" });
+    expect(() => assertProductionAuthConfigured()).not.toThrow();
   });
 
-  it("throws in production without the acknowledgment", () => {
+  it("does not throw in production when every required var is set", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PREAUTH_MODE_ACKNOWLEDGED", "");
-    expect(() => assertNotUnguardedProduction()).toThrow(/pre-auth|authentication/i);
+    stubAll({});
+    expect(() => assertProductionAuthConfigured()).not.toThrow();
   });
 
-  it("throws in production when the acknowledgment is any value other than the literal string 'true'", () => {
+  it("throws in production when AUTH_SECRET is missing", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PREAUTH_MODE_ACKNOWLEDGED", "yes");
-    expect(() => assertNotUnguardedProduction()).toThrow();
+    stubAll({ AUTH_SECRET: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_SECRET/);
   });
 
-  it("does not throw in production when explicitly acknowledged", () => {
+  it("throws in production when AUTH_GITHUB_ID is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    stubAll({ AUTH_GITHUB_ID: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_GITHUB_ID/);
+  });
+
+  it("throws in production when AUTH_GITHUB_SECRET is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    stubAll({ AUTH_GITHUB_SECRET: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_GITHUB_SECRET/);
+  });
+
+  it("throws in production when ALLOWED_SIGNIN_EMAILS is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    stubAll({ ALLOWED_SIGNIN_EMAILS: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/ALLOWED_SIGNIN_EMAILS/);
+  });
+
+  it("throws in production when ALLOWED_SIGNIN_EMAILS is whitespace-only", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    stubAll({ ALLOWED_SIGNIN_EMAILS: "   " });
+    expect(() => assertProductionAuthConfigured()).toThrow(/ALLOWED_SIGNIN_EMAILS/);
+  });
+
+  it("lists every missing variable in one error, not just the first", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "", ALLOWED_SIGNIN_EMAILS: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(
+      /AUTH_SECRET.*AUTH_GITHUB_ID.*AUTH_GITHUB_SECRET.*ALLOWED_SIGNIN_EMAILS/,
+    );
+  });
+
+  it("has no PREAUTH_MODE_ACKNOWLEDGED override -- fully-set-but-real-looking config still passes on its own merits", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("PREAUTH_MODE_ACKNOWLEDGED", "true");
-    expect(() => assertNotUnguardedProduction()).not.toThrow();
+    stubAll({ AUTH_SECRET: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_SECRET/);
   });
 });

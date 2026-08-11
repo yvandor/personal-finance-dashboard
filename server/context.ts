@@ -26,9 +26,11 @@ import { serverEnv } from "@/server/env";
  *
  * Falls back to a fixed DEV_USER_ID only when NODE_ENV !== "production"
  * AND ALLOW_DEV_AUTH_BYPASS === "true" — both conditions required, neither
- * implied by the other, mirroring server/env.ts's PREAUTH_MODE_ACKNOWLEDGED
- * pattern: an explicit, non-production-only escape hatch, never a silent
- * default. This is what keeps `npm run dev`, the full Vitest suite, and CI
+ * implied by the other: an explicit, non-production-only escape hatch,
+ * never a silent default, with no override in production (see
+ * server/env.ts's assertProductionAuthConfigured() — production has no
+ * pre-auth escape hatch at all anymore). This is what keeps `npm run dev`,
+ * the full Vitest suite, and CI
  * working without needing real GitHub OAuth App credentials configured —
  * those all still mock this module directly (`vi.mock("@/server/context")`)
  * and never reach `auth()` at all.
@@ -50,7 +52,7 @@ import { serverEnv } from "@/server/env";
  * directly and repeatedly from a plain Vitest test (no real request scope)
  * is exactly the kind of behavior worth not assuming, so the tested logic
  * bypasses the wrapper entirely. Same shape as server/env.ts's
- * assertNotUnguardedProduction() being exported separately from the
+ * assertProductionAuthConfigured() being exported separately from the
  * eager loadServerEnv() call it's used in.
  */
 export async function resolveUserId(): Promise<string> {

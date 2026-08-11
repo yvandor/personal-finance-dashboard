@@ -79,11 +79,6 @@ export default defineConfig({
     timeout: isProductionMode ? 180_000 : 60_000,
     env: {
       ...(process.env as Record<string, string>),
-      // See server/env.ts's boot-time guard (v1.4): `next build`/`next
-      // start` refuse to run under NODE_ENV=production without this. This
-      // e2e run is exactly the kind of controlled, non-public environment
-      // the escape hatch exists for.
-      ...(isProductionMode ? { PREAUTH_MODE_ACKNOWLEDGED: "true" } : {}),
       // v1.5: every existing spec (all resource CRUD, mobile/PWA, cache
       // headers) predates real auth and exercises the app as the fixed e2e
       // dev user, not a real signed-in session -- this keeps them all
@@ -108,7 +103,23 @@ export default defineConfig({
       // narrow fix: it tells Auth.js the one specific origin to trust rather
       // than disabling the check via trustHost: true, which would trust
       // whatever Host header any request claims.
-      ...(isProductionMode ? { AUTH_URL: baseURL } : {}),
+      //
+      // server/env.ts's assertProductionAuthConfigured() now hard-requires
+      // AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS too (there's
+      // no PREAUTH_MODE_ACKNOWLEDGED override anymore) -- throwaway values,
+      // same spirit as AUTH_SECRET above. Every production-mode spec
+      // authenticates via a real seeded database session (fixtures.ts's
+      // seedE2ESession()), never real GitHub OAuth, so these values are
+      // never actually exercised -- they only need to exist so the
+      // production build's boot-time guard passes.
+      ...(isProductionMode
+        ? {
+            AUTH_URL: baseURL,
+            AUTH_GITHUB_ID: "e2e-test-only-github-id-never-used-for-anything-real",
+            AUTH_GITHUB_SECRET: "e2e-test-only-github-secret-never-used-for-anything-real",
+            ALLOWED_SIGNIN_EMAILS: "e2e-unused@example.invalid",
+          }
+        : {}),
     },
   },
 });

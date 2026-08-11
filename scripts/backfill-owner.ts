@@ -145,33 +145,39 @@ function printDryRun(rowCountsByTable: Record<TableLabel, number>): void {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PrismaLike = any;
 
-// All eight reassignments run inside one $transaction: either every table's
-// rows move to the new owner, or none of them do.
+// All eight reassignments run inside one interactive transaction: either
+// every table's rows move to the new owner, or none of them do.
 //
-// Order matters and is NOT the display order above: `transactions_category_same_owner`
-// and `budgets_category_same_owner` (see prisma/schema.prisma's comment on
-// them) are real composite foreign keys -- (categoryId, userId) must match
-// an existing (id, userId) pair in categories at the moment each row is
-// written, and Postgres checks a non-deferred FK immediately after each
-// statement, not at commit. Categories must therefore be reassigned FIRST,
-// before transactions or budgets, or reassigning a transaction/budget while
-// its category still belongs to devUserId would fail that constraint. The
-// remaining tables (savingsGoal, savingsContribution, incomeSource,
-// recurringBill, recurringBillPayment) have no composite same-owner FK
-// referencing another reassigned table, so their relative order doesn't
-// matter -- see this script's accompanying report for the audit finding
-// that some of those relations lack that DB-level backstop entirely.
+// `transactions_category_same_owner` and `budgets_category_same_owner`
+// (see prisma/schema.prisma's comment on them) are composite foreign keys
+// -- (categoryId, userId) must match an existing (id, userId) pair in
+// categories. Reassigning EITHER side alone (category first, or
+// transaction/budget first) leaves that pair momentarily inconsistent, and
+// no ordering avoids it -- the two rows can only become consistent again
+// once BOTH updates have run. Found by rehearsing this script against a
+// real database (not assumed), which is why the two constraints are
+// DEFERRABLE INITIALLY IMMEDIATE as of prisma/migrations/
+// 20260811075601_defer_same_owner_fks -- normal application traffic still
+// gets the original immediate check (zero behavior change there), but this
+// script can explicitly defer both to end-of-transaction via `SET
+// CONSTRAINTS ... DEFERRED`, making the eight updates' relative order
+// genuinely not matter. The remaining tables (savingsGoal,
+// savingsContribution, incomeSource, recurringBill, recurringBillPayment)
+// have no composite same-owner FK at all -- see this script's accompanying
+// report for the audit finding that those relations rely on
+// application-level checks only.
 async function runReassignment(prisma: PrismaLike, devUserId: string, targetUserId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.category.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.transaction.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.budget.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.savingsGoal.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.savingsContribution.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.incomeSource.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.recurringBill.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-    prisma.recurringBillPayment.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } }),
-  ]);
+  await prisma.$transaction(async (tx: PrismaLike) => {
+    await tx.$executeRaw`SET CONSTRAINTS "transactions_category_same_owner", "budgets_category_same_owner" DEFERRED`;
+    await tx.category.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.transaction.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.budget.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.savingsGoal.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.savingsContribution.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.incomeSource.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.recurringBill.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+    await tx.recurringBillPayment.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
+  });
 }
 
 async function main(): Promise<void> {

@@ -10,14 +10,12 @@ import { z } from "zod";
 // only two modules that ever read these two variables; every other server
 // module reaches them only through those two, the same "one seam" pattern
 // requireUserId() itself already uses.
-// AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS are
-// deliberately .optional() here in v1.5's Phase 0/1 -- local dev and the
-// test suite both keep working via ALLOW_DEV_AUTH_BYPASS
-// (server/context.ts) without needing real GitHub OAuth App credentials
-// configured. Phase 2d makes these hard-required whenever
-// NODE_ENV=production, replacing (not supplementing) the
-// PREAUTH_MODE_ACKNOWLEDGED escape hatch below -- see that phase's commit
-// for the tightened guard.
+// AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS stay
+// .optional() in this schema -- they're genuinely optional outside
+// production, where ALLOW_DEV_AUTH_BYPASS (server/context.ts) lets local
+// dev and the test suite run without real GitHub OAuth App credentials
+// configured. assertProductionAuthConfigured() below is what makes them
+// hard-required specifically whenever NODE_ENV=production.
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required -- see .env.example."),
   DEV_USER_ID: z.string().min(1, "DEV_USER_ID is required -- see .env.example and server/context.ts."),
@@ -33,12 +31,15 @@ const serverEnvSchema = z.object({
   ALLOWED_SIGNIN_EMAILS: z.string().optional(),
 });
 
-// docs/PROJECT_PLAN.md §8: "the pre-auth build ... must never be deployed to
-// a public host or bound to a non-loopback interface," enforced until now
-// only by documentation, not code. requireUserId() (server/context.ts)
-// resolves every request to one fixed DEV_USER_ID -- fine for local
-// development, an active liability the moment NODE_ENV=production means
-// this process is serving (or being built to serve) real traffic.
+// docs/PROJECT_PLAN.md §8: "this app must never serve real traffic without
+// real authentication configured," enforced in code, not just
+// documentation. Through v1.5 Phase 0/1, requireUserId() (server/context.ts)
+// could still fall back to one fixed DEV_USER_ID in production via a
+// PREAUTH_MODE_ACKNOWLEDGED escape hatch -- that escape hatch has been
+// REMOVED (not tightened) now that real Auth.js v5 authentication
+// (server/auth.ts, lib/auth.ts) is verified end-to-end: production must
+// have real GitHub OAuth + sign-in-allowlist configuration, full stop, with
+// no override.
 //
 // Checked at BUILD time too, not just runtime: `next build` statically
 // prerenders several routes by actually executing their Server Component
@@ -47,20 +48,25 @@ const serverEnvSchema = z.object({
 // NODE_ENV=production for that command regardless of the calling shell's
 // own NODE_ENV. A runtime-only check would let a production bundle get
 // built -- and, on some platforms, deployed straight from that build step
-// -- without anyone ever having to acknowledge the gate. This is why CI's
-// `build` step and any local `next build` now both require the escape
-// hatch below; see .github/workflows/ci.yml.
-export function assertNotUnguardedProduction(): void {
+// -- without this configuration ever being verified. This is why CI's
+// `build` step and any local `next build` now both need real (if
+// throwaway, in CI) values for every variable below; see
+// .github/workflows/ci.yml and playwright.config.ts's production-mode
+// webServer env.
+export function assertProductionAuthConfigured(): void {
   if (process.env.NODE_ENV !== "production") return;
-  if (process.env.PREAUTH_MODE_ACKNOWLEDGED === "true") return;
-  throw new Error(
-    "Refusing to build or start in production: this app has no authentication yet " +
-      "(every request acts as one fixed user -- see server/context.ts) and must never " +
-      "serve real traffic or real financial data (docs/PROJECT_PLAN.md §8). If this is " +
-      "a deliberate pre-auth deployment you're restricting access to some other way " +
-      "(a private URL, a platform-level password, an IP allowlist), set " +
-      "PREAUTH_MODE_ACKNOWLEDGED=true to proceed anyway.",
-  );
+
+  const required = ["AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET", "ALLOWED_SIGNIN_EMAILS"] as const;
+  const missing = required.filter((name) => !process.env[name]?.trim());
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Refusing to build or start in production: missing required auth configuration (${missing.join(", ")}). ` +
+        "Real authentication (Auth.js v5 GitHub OAuth + a sign-in allowlist -- see server/auth.ts, " +
+        "lib/auth.ts) must be fully configured before this app can serve real traffic or real " +
+        "financial data (docs/PROJECT_PLAN.md §8). There is no pre-auth escape hatch anymore.",
+    );
+  }
 }
 
 function loadServerEnv() {
@@ -76,7 +82,7 @@ function loadServerEnv() {
     const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
     throw new Error(`Invalid server environment configuration -- missing or empty: ${missing}.`);
   }
-  assertNotUnguardedProduction();
+  assertProductionAuthConfigured();
   return parsed.data;
 }
 
