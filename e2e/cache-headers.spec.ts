@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { resetE2EData } from "./fixtures";
+import { resetE2EData, seedE2ESession } from "./fixtures";
 
 // Needs a real production build, not `next dev` -- these are exactly the
 // Cache-Control headers Next only emits once static-optimization/ISR
@@ -17,8 +17,16 @@ import { resetE2EData } from "./fixtures";
 // must send a private, no-store Cache-Control, so a CDN/edge cache (Vercel,
 // in production) can never serve one user's stale snapshot to anyone else.
 test.describe("Cache-Control on data-bearing pages", () => {
-  test.beforeEach(() => {
+  // Every path below is protected (proxy.ts + requireUserId()); the dev
+  // bypass is unavailable under NODE_ENV=production by design, so an
+  // unauthenticated goto() would follow proxy.ts's redirect to /sign-in and
+  // this test would end up checking /sign-in's headers instead of the
+  // intended route's. A real session (see fixtures.ts's seedE2ESession())
+  // is what lets goto() land on the actual page being tested.
+  test.beforeEach(async ({ context }) => {
     resetE2EData();
+    const cookie = seedE2ESession();
+    await context.addCookies([cookie]);
   });
 
   for (const path of ["/transactions", "/budgets", "/categories", "/bills", "/income", "/goals", "/history", "/dashboard"]) {

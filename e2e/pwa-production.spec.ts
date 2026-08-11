@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { resetE2EData } from "./fixtures";
+import { resetE2EData, seedE2ESession } from "./fixtures";
 
 // These two tests need a real production build, not `next dev` --
 // components/pwa/ServiceWorkerRegistration.tsx deliberately skips calling
@@ -15,7 +15,13 @@ import { resetE2EData } from "./fixtures";
 // playwright.config.ts's comment for why the two modes are never run
 // concurrently (both would fight over the same .next output directory).
 test.describe("Service worker registration", () => {
-  test("registers successfully after page load", async ({ page }) => {
+  test("registers successfully after page load", async ({ page, context }) => {
+    // /dashboard is a protected route (proxy.ts + requireUserId()) -- the
+    // dev bypass is unavailable under NODE_ENV=production by design, so
+    // this needs a real database-strategy session, same as production
+    // traffic would have. See fixtures.ts's seedE2ESession().
+    const cookie = seedE2ESession();
+    await context.addCookies([cookie]);
     await page.goto("/dashboard");
     const registration = await page.evaluate(async () => {
       if (!("serviceWorker" in navigator)) return null;
@@ -44,6 +50,8 @@ test.describe("Offline fallback -- core safety requirement", () => {
     resetE2EData([
       { type: "INCOME", amountCents: 500000, date: "2026-01-05", description: "Paycheck", categoryName: "Salary" },
     ]);
+    const cookie = seedE2ESession();
+    await context.addCookies([cookie]);
 
     // Visit online first so the service worker has a chance to install and
     // precache /offline (see public/sw.js's install handler) before the

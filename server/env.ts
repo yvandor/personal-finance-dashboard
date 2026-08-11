@@ -10,9 +10,27 @@ import { z } from "zod";
 // only two modules that ever read these two variables; every other server
 // module reaches them only through those two, the same "one seam" pattern
 // requireUserId() itself already uses.
+// AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS are
+// deliberately .optional() here in v1.5's Phase 0/1 -- local dev and the
+// test suite both keep working via ALLOW_DEV_AUTH_BYPASS
+// (server/context.ts) without needing real GitHub OAuth App credentials
+// configured. Phase 2d makes these hard-required whenever
+// NODE_ENV=production, replacing (not supplementing) the
+// PREAUTH_MODE_ACKNOWLEDGED escape hatch below -- see that phase's commit
+// for the tightened guard.
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required -- see .env.example."),
   DEV_USER_ID: z.string().min(1, "DEV_USER_ID is required -- see .env.example and server/context.ts."),
+  AUTH_SECRET: z.string().min(1).optional(),
+  AUTH_GITHUB_ID: z.string().min(1).optional(),
+  AUTH_GITHUB_SECRET: z.string().min(1).optional(),
+  // Comma-separated email allowlist -- this app has no self-serve sign-up
+  // story (see docs/PROJECT_PLAN.md §8 and README's Roadmap): only accounts
+  // whose email appears here may complete sign-in, checked in
+  // server/auth.ts's signIn callback. Parsed into a Set by lib/auth.ts's
+  // isAllowedSigninEmail(), not here, so the parsing logic is independently
+  // unit-testable.
+  ALLOWED_SIGNIN_EMAILS: z.string().optional(),
 });
 
 // docs/PROJECT_PLAN.md §8: "the pre-auth build ... must never be deployed to
@@ -49,6 +67,10 @@ function loadServerEnv() {
   const parsed = serverEnvSchema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
     DEV_USER_ID: process.env.DEV_USER_ID,
+    AUTH_SECRET: process.env.AUTH_SECRET,
+    AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID,
+    AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET,
+    ALLOWED_SIGNIN_EMAILS: process.env.ALLOWED_SIGNIN_EMAILS,
   });
   if (!parsed.success) {
     const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");

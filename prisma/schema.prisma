@@ -33,24 +33,29 @@ enum GoalStatus {
 // ---------------------------------------------------------------------------
 // Domain models
 //
-// Authentication is not implemented in this phase. The `User` model exists
-// now only as the ownership anchor every other table hangs a `userId` off
-// of, which is what lets a later Auth.js integration thread a real session
-// user through unchanged queries instead of retrofitting isolation onto
-// data that assumed a single user. Auth.js's own adapter tables (Account,
-// Session, VerificationToken) and the extra User fields it expects
-// (name, emailVerified, image) are deliberately NOT added yet — they are
-// pure auth infrastructure with no use until auth is actually wired up, and
-// adding them later is an additive, low-risk migration.
+// Authentication (v1.5): `User` was designed from the first migration to be
+// the ownership anchor every other table hangs a `userId` off of, precisely
+// so a real Auth.js integration could thread a real session user through
+// every existing query unchanged, rather than retrofitting isolation onto
+// data that assumed a single user. This is that migration. `Account`,
+// `Session`, and `VerificationToken` below are @auth/prisma-adapter's
+// standard schema, additive only -- no existing table's shape changed
+// beyond `User` gaining the four columns Auth.js's adapter expects
+// (name, emailVerified, image, plus the new relations).
 // ---------------------------------------------------------------------------
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  currency  String   @default("USD") @db.Char(3) // display formatting only; no FX conversion
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  currency      String    @default("USD") @db.Char(3) // display formatting only; no FX conversion
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
+  accounts       Account[]
+  sessions       Session[]
   categories     Category[]
   transactions   Transaction[]
   budgets        Budget[]
@@ -61,6 +66,55 @@ model User {
   billPayments   RecurringBillPayment[]
 
   @@map("users")
+}
+
+// @auth/prisma-adapter's standard shape -- see
+// https://authjs.dev/getting-started/adapters/prisma. Untouched from the
+// library's documented schema except @@map, matching this app's existing
+// snake_case table-naming convention.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// Database sessions (not JWT) -- deliberate, per docs/PROJECT_PLAN.md §8:
+// instant server-side revocation (delete the row, the session is dead --
+// impossible with JWTs without a denylist), rotation-on-sign-in as free
+// fixation mitigation, and the DB is already in the request path via
+// requireUserId() on every request regardless.
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model Category {

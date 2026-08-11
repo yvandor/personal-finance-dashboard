@@ -67,7 +67,14 @@ export default defineConfig({
     // instead of the isolated E2E database; the different port makes that
     // structurally impossible rather than a config convention to trust.
     command: isProductionMode ? `npm run build && npm run start -- -p ${PORT}` : `npm run dev -- -p ${PORT}`,
-    url: baseURL,
+    // v1.5: `/` is now a protected route (proxy.ts + requireUserId()) that
+    // 307s to /sign-in for an unauthenticated request -- readiness-probing
+    // it directly means this fetch follows that redirect and, until
+    // Phase 1 adds an actual /sign-in page, lands on a 404, which this
+    // webServer check reads as "not ready yet" forever. /api/health is
+    // deliberately public (see proxy.ts's PUBLIC_PATHS) for exactly this
+    // kind of unauthenticated liveness probe.
+    url: `${baseURL}/api/health`,
     reuseExistingServer: false,
     timeout: isProductionMode ? 180_000 : 60_000,
     env: {
@@ -77,6 +84,31 @@ export default defineConfig({
       // e2e run is exactly the kind of controlled, non-public environment
       // the escape hatch exists for.
       ...(isProductionMode ? { PREAUTH_MODE_ACKNOWLEDGED: "true" } : {}),
+      // v1.5: every existing spec (all resource CRUD, mobile/PWA, cache
+      // headers) predates real auth and exercises the app as the fixed e2e
+      // dev user, not a real signed-in session -- this keeps them all
+      // passing unchanged via server/context.ts's dev bypass. Auth-specific
+      // behavior (real sign-in, protected-route redirect, sign-out,
+      // cross-user with two real identities) needs the bypass OFF to be
+      // observable at all -- see e2e/auth*.spec.ts's own webServer mode.
+      ALLOW_DEV_AUTH_BYPASS: "true",
+      // next-auth requires this unconditionally at request time (not just
+      // when a real session is found) -- proxy.ts's auth() call fails
+      // every single request without it, regardless of the dev bypass
+      // above, since that failure happens in Auth.js itself before
+      // server/context.ts's fallback logic ever runs. Throwaway,
+      // e2e-local-only value -- same "container-local, never used outside
+      // this job" spirit as this file's own DATABASE_URL/DEV_USER_ID.
+      AUTH_SECRET: "e2e-test-only-secret-never-used-for-anything-real",
+      // Auth.js v5 enforces strict Host-header trust under NODE_ENV=production
+      // (dev mode trusts localhost implicitly, which is why only the
+      // production-mode run needs this) -- without an explicit AUTH_URL it
+      // rejects every request against http://localhost:3100 as an untrusted
+      // host. Setting AUTH_URL to this run's exact, fixed baseURL is the
+      // narrow fix: it tells Auth.js the one specific origin to trust rather
+      // than disabling the check via trustHost: true, which would trust
+      // whatever Host header any request claims.
+      ...(isProductionMode ? { AUTH_URL: baseURL } : {}),
     },
   },
 });

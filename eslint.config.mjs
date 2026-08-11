@@ -26,12 +26,17 @@ const eslintConfig = defineConfig([
   // isolation auditable -- see docs/PROJECT_PLAN.md's architecture
   // section. Exemptions are every place that legitimately already touches
   // Prisma directly and predates this rule: server/db.ts itself (the one
-  // place allowed to construct the client), and test/seed/E2E fixtures
+  // place allowed to construct the client), test/seed/E2E fixtures
   // (tests/**, e2e/**, prisma/**) which intentionally bypass the DAL for
-  // direct setup/assertion against a real database, same as the DAL does.
+  // direct setup/assertion against a real database, same as the DAL does,
+  // and server/auth.ts (v1.5) -- @auth/prisma-adapter needs the client
+  // instance directly to manage its own Account/Session/VerificationToken
+  // queries, a fundamentally different, infrastructure-level use than the
+  // DAL boundary exists to prevent (ad-hoc business-logic queries scattered
+  // outside server/data/**).
   {
     files: ["**/*.{ts,tsx}"],
-    ignores: ["server/data/**", "server/db.ts", "tests/**", "e2e/**", "prisma/**"],
+    ignores: ["server/data/**", "server/db.ts", "server/auth.ts", "tests/**", "e2e/**", "prisma/**"],
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
