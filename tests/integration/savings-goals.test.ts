@@ -10,6 +10,11 @@ import {
   listGoalContributions,
   listAllContributions,
 } from "@/server/data/savingsGoals";
+import {
+  updateSavingsGoalAction,
+  deleteSavingsGoalAction,
+  contributeToGoalAction,
+} from "@/server/actions/savingsGoals";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { DEV_USER_ID, OTHER_USER_ID, resetTestData } from "../setup";
 
@@ -18,8 +23,23 @@ vi.mock("@/server/context", () => ({
   requireUserId: vi.fn(),
 }));
 
+// revalidatePath depends on Next's request-scoped internals, which don't
+// exist when calling a Server Action directly under Vitest -- same as
+// tests/integration/transaction-actions.test.ts.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 function actAs(userId: string) {
   vi.mocked(requireUserId).mockResolvedValue(userId);
+}
+
+function formData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
 }
 
 const NONEXISTENT_ID = "clh3ans2z0000356ub9pu9q0m";
@@ -301,6 +321,60 @@ describe("savings goals DAL", () => {
 
       actAs(DEV_USER_ID);
       expect(await listAllContributions()).toEqual([]);
+    });
+  });
+
+  // Server-Action-level adversarial coverage: proves a forged id in
+  // FormData sent through server/actions/savingsGoals.ts never reaches
+  // another user's row, mirroring
+  // tests/integration/transaction-actions.test.ts's approach one layer
+  // above the DAL-level tests above.
+  describe("savings goal Server Actions", () => {
+    it("cannot update another user's goal via updateSavingsGoalAction, and the row is unmodified", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createSavingsGoal({ name: "Their Fund", targetCents: 500000 });
+
+      actAs(DEV_USER_ID);
+      const result = await updateSavingsGoalAction(theirs.id, null, formData({ name: "Hacked", target: "1.00" }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      actAs(OTHER_USER_ID);
+      const stillThere = await prisma.savingsGoal.findUnique({ where: { id: theirs.id } });
+      expect(stillThere?.name).toBe("Their Fund");
+    });
+
+    it("cannot delete another user's goal via deleteSavingsGoalAction", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createSavingsGoal({ name: "Their Fund", targetCents: 500000 });
+
+      actAs(DEV_USER_ID);
+      const result = await deleteSavingsGoalAction(theirs.id, null);
+      expect(result.ok).toBe(false);
+
+      actAs(OTHER_USER_ID);
+      expect(await prisma.savingsGoal.findUnique({ where: { id: theirs.id } })).not.toBeNull();
+    });
+
+    it("cannot contribute to another user's goal via contributeToGoalAction, and no contribution is created", async () => {
+      actAs(OTHER_USER_ID);
+      const theirs = await createSavingsGoal({ name: "Their Fund", targetCents: 500000 });
+
+      actAs(DEV_USER_ID);
+      const result = await contributeToGoalAction(
+        theirs.id,
+        null,
+        formData({ amount: "50.00", direction: "DEPOSIT", date: "2026-03-10" }),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/couldn't be found/i);
+      }
+
+      const contributions = await prisma.savingsContribution.findMany({ where: { goalId: theirs.id } });
+      expect(contributions).toHaveLength(0);
     });
   });
 });
