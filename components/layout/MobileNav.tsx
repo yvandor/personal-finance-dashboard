@@ -77,7 +77,17 @@ export function MobileNav({ signOutSlot }: MobileNavProps) {
           if (e.target === dialogRef.current) setOpen(false);
         }}
         aria-label="Navigation menu"
-        className="m-0 flex h-dvh max-h-dvh w-72 max-w-[80vw] flex-col border-none bg-surface p-0 text-foreground backdrop:bg-black/50"
+        // `hidden ... open:flex`, not a plain `flex` -- a native <dialog>'s
+        // closed state relies on the UA stylesheet's `dialog:not([open]) {
+        // display: none }`, which a same-element `flex` utility class
+        // overrides regardless of the dialog's actual open/closed state
+        // (found via e2e: the drawer was measurably laid out, just
+        // positioned off-screen, even while closed). Gating display:flex
+        // behind the `open:` variant makes `hidden` the explicit default
+        // and only switches to flex once .showModal() sets the `open`
+        // attribute -- matches Tailwind's own documented pattern for
+        // dialog/details elements.
+        className="m-0 hidden h-dvh max-h-dvh w-72 max-w-[80vw] flex-col border-none bg-surface p-0 text-foreground open:flex backdrop:bg-black/50"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <span className="text-lg font-semibold">Finance</span>
