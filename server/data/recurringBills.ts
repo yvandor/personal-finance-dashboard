@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import { recurringBillCreateSchema, recurringBillUpdateSchema, markBillPaidSchema } from "@/lib/schemas/recurringBill";
 import { computeBillStatus, type BillStatus } from "@/lib/recurringBills";
 import { currentMonthKey } from "@/lib/dates";
@@ -107,7 +108,7 @@ function toValidationError(err: unknown): never {
 async function assertBillableCategory(categoryId: string, userId: string): Promise<{ name: string }> {
   const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
   if (!category) {
-    throw new NotFoundError("Category not found");
+    throw authzDenied("category", categoryId);
   }
   if (category.type !== "EXPENSE") {
     throw new ValidationError(
@@ -168,7 +169,7 @@ export async function updateRecurringBill(id: string, input: unknown): Promise<R
       },
     });
     if (result.count === 0) {
-      throw new NotFoundError("Recurring bill not found");
+      throw authzDenied("recurringBill", id);
     }
   } catch (err) {
     if (err instanceof NotFoundError) throw err;
@@ -180,7 +181,7 @@ export async function updateRecurringBill(id: string, input: unknown): Promise<R
     include: { category: { select: { name: true } } },
   });
   if (!updated) {
-    throw new NotFoundError("Recurring bill not found");
+    throw authzDenied("recurringBill", id);
   }
   return toDTO(updated, updated.category?.name ?? null);
 }
@@ -189,7 +190,7 @@ async function setActive(id: string, isActive: boolean): Promise<void> {
   const userId = await requireUserId();
   const result = await prisma.recurringBill.updateMany({ where: { id, userId }, data: { isActive } });
   if (result.count === 0) {
-    throw new NotFoundError("Recurring bill not found");
+    throw authzDenied("recurringBill", id);
   }
 }
 
@@ -232,7 +233,7 @@ export async function markBillPaid(
     include: { category: { select: { name: true } } },
   });
   if (!bill) {
-    throw new NotFoundError("Recurring bill not found");
+    throw authzDenied("recurringBill", billId);
   }
   if (data.logTransaction && !bill.categoryId) {
     throw new ValidationError(

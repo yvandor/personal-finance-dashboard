@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import {
   savingsGoalCreateSchema,
   savingsGoalUpdateSchema,
@@ -138,7 +139,7 @@ export async function listGoalContributions(goalId: string): Promise<Contributio
   const userId = await requireUserId();
   const goal = await prisma.savingsGoal.findFirst({ where: { id: goalId, userId } });
   if (!goal) {
-    throw new NotFoundError("Savings goal not found");
+    throw authzDenied("savingsGoal", goalId);
   }
   const rows = await prisma.savingsContribution.findMany({
     where: { goalId, userId },
@@ -197,7 +198,7 @@ export async function updateSavingsGoal(id: string, input: unknown): Promise<Sav
       },
     });
     if (result.count === 0) {
-      throw new NotFoundError("Savings goal not found");
+      throw authzDenied("savingsGoal", id);
     }
   } catch (err) {
     if (err instanceof NotFoundError) throw err;
@@ -206,7 +207,7 @@ export async function updateSavingsGoal(id: string, input: unknown): Promise<Sav
 
   const updated = await prisma.savingsGoal.findFirst({ where: { id, userId } });
   if (!updated) {
-    throw new NotFoundError("Savings goal not found");
+    throw authzDenied("savingsGoal", id);
   }
   return toDTO(updated);
 }
@@ -220,7 +221,7 @@ export async function deleteSavingsGoal(id: string): Promise<void> {
   await prisma.savingsContribution.deleteMany({ where: { goalId: id, userId } });
   const result = await prisma.savingsGoal.deleteMany({ where: { id, userId } });
   if (result.count === 0) {
-    throw new NotFoundError("Savings goal not found");
+    throw authzDenied("savingsGoal", id);
   }
 }
 
@@ -239,7 +240,7 @@ export async function contributeToGoal(goalId: string, input: unknown): Promise<
 
   const goal = await prisma.savingsGoal.findFirst({ where: { id: goalId, userId } });
   if (!goal) {
-    throw new NotFoundError("Savings goal not found");
+    throw authzDenied("savingsGoal", goalId);
   }
 
   await prisma.savingsContribution.create({

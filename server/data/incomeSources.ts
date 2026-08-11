@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import {
   incomeSourceCreateSchema,
   incomeSourceUpdateSchema,
@@ -109,7 +110,7 @@ export async function updateIncomeSource(id: string, input: unknown): Promise<In
       },
     });
     if (result.count === 0) {
-      throw new NotFoundError("Income source not found");
+      throw authzDenied("incomeSource", id);
     }
   } catch (err) {
     if (err instanceof NotFoundError) throw err;
@@ -118,7 +119,7 @@ export async function updateIncomeSource(id: string, input: unknown): Promise<In
 
   const updated = await prisma.incomeSource.findFirst({ where: { id, userId } });
   if (!updated) {
-    throw new NotFoundError("Income source not found");
+    throw authzDenied("incomeSource", id);
   }
   return toDTO(updated);
 }
@@ -127,7 +128,7 @@ async function setActive(id: string, isActive: boolean): Promise<void> {
   const userId = await requireUserId();
   const result = await prisma.incomeSource.updateMany({ where: { id, userId }, data: { isActive } });
   if (result.count === 0) {
-    throw new NotFoundError("Income source not found");
+    throw authzDenied("incomeSource", id);
   }
 }
 

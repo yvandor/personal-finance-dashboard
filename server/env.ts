@@ -3,13 +3,12 @@ import { z } from "zod";
 
 // Validated once, at first import, rather than trusting raw
 // `process.env.X` reads scattered across the codebase. A missing or empty
-// DATABASE_URL/DEV_USER_ID now fails loudly and immediately -- naming
-// which variable is missing, never its value -- instead of surfacing much
-// later as a confusing Prisma connection error or a silent
-// wrong/undefined-user bug. server/db.ts and server/context.ts are the
-// only two modules that ever read these two variables; every other server
-// module reaches them only through those two, the same "one seam" pattern
-// requireUserId() itself already uses.
+// DATABASE_URL now fails loudly and immediately -- naming which variable is
+// missing, never its value -- instead of surfacing much later as a
+// confusing Prisma connection error. server/db.ts and server/context.ts are
+// the only two modules that ever read anything from here; every other
+// server module reaches these values only through those two, the same "one
+// seam" pattern requireUserId() itself already uses.
 // AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS stay
 // .optional() in this schema -- they're genuinely optional outside
 // production, where ALLOW_DEV_AUTH_BYPASS (server/context.ts) lets local
@@ -18,7 +17,25 @@ import { z } from "zod";
 // hard-required specifically whenever NODE_ENV=production.
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required -- see .env.example."),
-  DEV_USER_ID: z.string().min(1, "DEV_USER_ID is required -- see .env.example and server/context.ts."),
+  // .optional() as of v1.6, having been hard-required since the pre-auth
+  // build. Exactly one line in the request-serving path still reads it --
+  // server/context.ts's dev-bypass branch -- and that branch is unreachable
+  // in production twice over: NODE_ENV !== "production" AND
+  // ALLOW_DEV_AUTH_BYPASS === "true" are both required, and the
+  // PREAUTH_MODE_ACKNOWLEDGED escape hatch that once let production reach it
+  // was removed outright in v1.5 Phase 2d. Everything else that consumes it
+  // (tests/setup.ts, e2e/fixtures.ts, e2e/reset-data.ts,
+  // scripts/backfill-owner.ts) reads process.env.DEV_USER_ID directly with
+  // its own fallback and never goes through this schema at all.
+  // Keeping it required therefore bought no safety and cost something real:
+  // a production deployment would have had to invent a meaningless
+  // placeholder value purely to get past validation -- a secret-shaped env
+  // var set to a lie, which is worse than absent, because the next reader
+  // has to work out whether it means anything. Absent now means absent.
+  // server/context.ts fails loudly if the bypass is ever asked for without
+  // it, so a misconfigured local dev environment still gets a clear error
+  // rather than a silent undefined user.
+  DEV_USER_ID: z.string().min(1).optional(),
   AUTH_SECRET: z.string().min(1).optional(),
   AUTH_GITHUB_ID: z.string().min(1).optional(),
   AUTH_GITHUB_SECRET: z.string().min(1).optional(),

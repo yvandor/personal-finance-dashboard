@@ -12,6 +12,7 @@ import {
 } from "@/server/data/savingsGoals";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { reportUnexpectedActionError } from "@/server/logger";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/budgets.ts.
@@ -22,7 +23,7 @@ function errorResult(message: string, fieldErrors?: Record<string, string[]>): A
   return { ok: false, error: message, fieldErrors };
 }
 
-function toErrorResult(err: unknown): ActionResult<never> {
+function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof z.ZodError) {
     const fieldErrors = err.flatten().fieldErrors as Record<string, string[]>;
     return errorResult("Please fix the highlighted fields.", fieldErrors);
@@ -33,7 +34,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
-  console.error("Unexpected error in a savings goal action:", err);
+  reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
 
@@ -73,7 +74,7 @@ export async function createSavingsGoalAction(
     revalidatePath(GOALS_PATH);
     return { ok: true, data: created };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "createSavingsGoalAction");
   }
 }
 
@@ -100,7 +101,7 @@ export async function updateSavingsGoalAction(
     revalidatePath(GOALS_PATH);
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "updateSavingsGoalAction");
   }
 }
 
@@ -114,7 +115,7 @@ export async function deleteSavingsGoalAction(
     revalidatePath(GOALS_PATH);
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "deleteSavingsGoalAction");
   }
 }
 
@@ -141,6 +142,6 @@ export async function contributeToGoalAction(
     revalidatePath(GOALS_PATH);
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "contributeToGoalAction");
   }
 }

@@ -62,6 +62,20 @@ export async function resolveUserId(): Promise<string> {
   }
 
   if (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH_BYPASS === "true") {
+    // DEV_USER_ID is .optional() in server/env.ts as of v1.6 (see the
+    // reasoning there), so this is the one place that has to handle its
+    // absence. Throwing, rather than redirecting to /sign-in, because
+    // asking for the bypass and not configuring the identity it resolves to
+    // is a broken local setup, not an unauthenticated visitor -- and a
+    // silent redirect would read as "the bypass flag doesn't work,"
+    // sending someone off to debug auth instead of their .env. Names the
+    // variable, never a value, same as server/env.ts's own failures.
+    if (!serverEnv.DEV_USER_ID) {
+      throw new Error(
+        "ALLOW_DEV_AUTH_BYPASS is set but DEV_USER_ID is not -- the dev bypass has no identity to resolve to. " +
+          "Set DEV_USER_ID (see .env.example), or unset ALLOW_DEV_AUTH_BYPASS to use real sign-in.",
+      );
+    }
     return serverEnv.DEV_USER_ID;
   }
 

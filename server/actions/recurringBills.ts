@@ -13,6 +13,7 @@ import {
 } from "@/server/data/recurringBills";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { reportUnexpectedActionError } from "@/server/logger";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/categories.ts: extract FormData
@@ -26,7 +27,7 @@ function errorResult(message: string, fieldErrors?: Record<string, string[]>): A
   return { ok: false, error: message, fieldErrors };
 }
 
-function toErrorResult(err: unknown): ActionResult<never> {
+function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof z.ZodError) {
     const fieldErrors = err.flatten().fieldErrors as Record<string, string[]>;
     return errorResult("Please fix the highlighted fields.", fieldErrors);
@@ -37,7 +38,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
-  console.error("Unexpected error in a recurring bill action:", err);
+  reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
 
@@ -91,7 +92,7 @@ export async function createRecurringBillAction(
     revalidateBillPaths();
     return { ok: true, data: created };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "createRecurringBillAction");
   }
 }
 
@@ -116,7 +117,7 @@ export async function updateRecurringBillAction(
     revalidateBillPaths();
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "updateRecurringBillAction");
   }
 }
 
@@ -132,7 +133,7 @@ export async function archiveRecurringBillAction(
     revalidateBillPaths();
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "archiveRecurringBillAction");
   }
 }
 
@@ -146,7 +147,7 @@ export async function unarchiveRecurringBillAction(
     revalidateBillPaths();
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "unarchiveRecurringBillAction");
   }
 }
 
@@ -168,6 +169,6 @@ export async function markBillPaidAction(
     revalidateBillPaths();
     return { ok: true, data: result };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "markBillPaidAction");
   }
 }
