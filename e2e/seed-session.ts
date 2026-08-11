@@ -15,32 +15,38 @@ import { PrismaClient } from "../app/generated/prisma/client";
 // against Session.sessionToken (no hashing) -- verified against
 // @auth/core's own session action, not assumed -- so the token generated
 // here can be set as the cookie value as-is.
-const [, , outputPath] = process.argv;
+// userId/email are optional (argv[3], argv[4]) so cross-user e2e specs (see
+// e2e/cross-user.spec.ts) can seed a second, distinct identity alongside the
+// fixed DEV_USER_ID one -- defaults preserve the original single-user
+// behavior every existing caller (fixtures.ts's seedE2ESession()) relies on.
+const [, , outputPath, userIdArg, emailArg] = process.argv;
 if (!outputPath) {
-  throw new Error("Usage: seed-session.ts <outputPath>");
+  throw new Error("Usage: seed-session.ts <outputPath> [userId] [email]");
 }
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
-const DEV_USER_ID = process.env.DEV_USER_ID ?? "e2e-dev-user";
+const userId = userIdArg ?? process.env.DEV_USER_ID ?? "e2e-dev-user";
+const email = emailArg ?? "e2e-dev@example.invalid";
 
 async function main() {
   // The same fixed user resetE2EData() upserts -- production-mode specs
   // call resetE2EData() in their own beforeEach first, so this row already
   // exists by the time a spec seeds a session; upserting the user here too
-  // keeps this script safe to call standalone as well.
+  // keeps this script safe to call standalone as well. A non-default userId
+  // (a second cross-user identity) is upserted the same way.
   await prisma.user.upsert({
-    where: { id: DEV_USER_ID },
-    create: { id: DEV_USER_ID, email: "e2e-dev@example.invalid" },
+    where: { id: userId },
+    create: { id: userId, email },
     update: {},
   });
 
   const sessionToken = randomUUID();
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  await prisma.session.deleteMany({ where: { userId: DEV_USER_ID } });
+  await prisma.session.deleteMany({ where: { userId } });
   await prisma.session.create({
-    data: { sessionToken, userId: DEV_USER_ID, expires },
+    data: { sessionToken, userId, expires },
   });
 
   writeFileSync(outputPath, JSON.stringify({ sessionToken, expires: expires.toISOString() }), "utf8");

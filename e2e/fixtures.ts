@@ -67,12 +67,20 @@ export function resetE2EData(seedTransactions: SeedTransactionInput[] = []): Res
 // e2e/seed-session.ts) and returns it as a Playwright cookie descriptor for
 // context.addCookies() -- an actual Auth.js session, not a bypass, so these
 // specs exercise the exact same auth path production traffic does.
-export function seedE2ESession(): { name: string; value: string; url: string } {
+// `user` lets cross-user specs seed a SECOND, distinct identity (a real
+// second users/sessions row, not the fixed DEV_USER_ID) -- omit it to get
+// the original single fixed-user behavior every other caller relies on.
+export function seedE2ESession(user?: { userId: string; email: string }): {
+  name: string;
+  value: string;
+  url: string;
+} {
   const id = randomUUID();
   const outputPath = path.join(tmpdir(), `e2e-session-output-${id}.json`);
+  const userArgs = user ? ` "${user.userId}" "${user.email}"` : "";
 
   try {
-    execSync(`npx tsx e2e/seed-session.ts "${outputPath}"`, {
+    execSync(`npx tsx e2e/seed-session.ts "${outputPath}"${userArgs}`, {
       env: process.env,
       stdio: "pipe",
     });
