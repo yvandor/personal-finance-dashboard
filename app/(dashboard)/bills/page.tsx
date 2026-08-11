@@ -12,6 +12,12 @@ import { BillsBoard } from "@/components/bills/BillsBoard";
 // every bill's displayed status and the "mark paid" dialog agree on exactly
 // which month they mean, instead of the client re-deriving it from its own
 // clock (see lib/recurringBills.ts's computeBillStatus).
+//
+// force-dynamic (v1.4): see app/(dashboard)/categories/page.tsx's comment --
+// this page was statically prerendered and served with a one-year shared
+// cache lifetime despite reading live bill data, found via a real
+// production-server header check.
+export const dynamic = "force-dynamic";
 export default async function BillsPage() {
   const periodMonth = currentMonthKey();
 

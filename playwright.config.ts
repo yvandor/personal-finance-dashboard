@@ -10,30 +10,34 @@ loadEnv({ path: path.resolve(process.cwd(), ".env.e2e"), quiet: true });
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
 
-// e2e/pwa-production.spec.ts's two service-worker tests need a real
-// production build -- components/pwa/ServiceWorkerRegistration.tsx
-// deliberately skips registering at all under NODE_ENV=development, which
-// `next dev` (the default webServer below) always is. Two constraints rule
-// out just always running a production server alongside the dev one:
+// Two spec files need a real production build, not `next dev`:
+//   - e2e/pwa-production.spec.ts's service-worker tests --
+//     components/pwa/ServiceWorkerRegistration.tsx deliberately skips
+//     registering at all under NODE_ENV=development.
+//   - e2e/cache-headers.spec.ts -- the Cache-Control headers it asserts on
+//     only reflect Next's real static-optimization/ISR behavior in a
+//     production build; dev mode doesn't apply the same caching.
+// Two constraints rule out just always running a production server
+// alongside the dev one:
 //   1. Cost -- a production build takes real time; paying it on every
-//      `npm run test:e2e` run for the sake of 2 tests out of 30+ would slow
-//      every other spec's dev loop too, not just this one.
+//      `npm run test:e2e` run for the sake of a handful of tests out of 30+
+//      would slow every other spec's dev loop too, not just these.
 //   2. Safety -- `next dev` and `next build` both read/write the same
 //      `.next` output directory by default; running them concurrently
 //      risks one corrupting the other's in-progress state.
 // `npm run test:e2e:pwa` (E2E_MODE=production) swaps this whole config over
 // to a single dedicated production webServer + project that runs ONLY
-// e2e/pwa-production.spec.ts, on the same port -- the two modes are never
-// invoked in the same process, so they never run concurrently.
+// these two files, on the same port -- the two modes are never invoked in
+// the same process, so they never run concurrently.
 const isProductionMode = process.env.E2E_MODE === "production";
-const PWA_PRODUCTION_SPEC = "pwa-production.spec.ts";
+const PRODUCTION_ONLY_SPECS = /(pwa-production|cache-headers)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
-  testMatch: isProductionMode ? PWA_PRODUCTION_SPEC : undefined,
-  testIgnore: isProductionMode ? undefined : PWA_PRODUCTION_SPEC,
+  testMatch: isProductionMode ? PRODUCTION_ONLY_SPECS : undefined,
+  testIgnore: isProductionMode ? undefined : PRODUCTION_ONLY_SPECS,
   // This app has exactly one identity (DEV_USER_ID, no real auth -- see
   // server/context.ts) and every test shares that single user's data.
   // Running fully serial is an honest reflection of that architectural
