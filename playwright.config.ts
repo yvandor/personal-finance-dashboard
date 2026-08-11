@@ -10,10 +10,30 @@ loadEnv({ path: path.resolve(process.cwd(), ".env.e2e"), quiet: true });
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
 
+// e2e/pwa-production.spec.ts's two service-worker tests need a real
+// production build -- components/pwa/ServiceWorkerRegistration.tsx
+// deliberately skips registering at all under NODE_ENV=development, which
+// `next dev` (the default webServer below) always is. Two constraints rule
+// out just always running a production server alongside the dev one:
+//   1. Cost -- a production build takes real time; paying it on every
+//      `npm run test:e2e` run for the sake of 2 tests out of 30+ would slow
+//      every other spec's dev loop too, not just this one.
+//   2. Safety -- `next dev` and `next build` both read/write the same
+//      `.next` output directory by default; running them concurrently
+//      risks one corrupting the other's in-progress state.
+// `npm run test:e2e:pwa` (E2E_MODE=production) swaps this whole config over
+// to a single dedicated production webServer + project that runs ONLY
+// e2e/pwa-production.spec.ts, on the same port -- the two modes are never
+// invoked in the same process, so they never run concurrently.
+const isProductionMode = process.env.E2E_MODE === "production";
+const PWA_PRODUCTION_SPEC = "pwa-production.spec.ts";
+
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
+  testMatch: isProductionMode ? PWA_PRODUCTION_SPEC : undefined,
+  testIgnore: isProductionMode ? undefined : PWA_PRODUCTION_SPEC,
   // This app has exactly one identity (DEV_USER_ID, no real auth -- see
   // server/context.ts) and every test shares that single user's data.
   // Running fully serial is an honest reflection of that architectural
@@ -42,10 +62,17 @@ export default defineConfig({
     // silently pointed at a real `npm run dev` session against finance_dev
     // instead of the isolated E2E database; the different port makes that
     // structurally impossible rather than a config convention to trust.
-    command: `npm run dev -- -p ${PORT}`,
+    command: isProductionMode ? `npm run build && npm run start -- -p ${PORT}` : `npm run dev -- -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: false,
-    timeout: 60_000,
-    env: process.env as Record<string, string>,
+    timeout: isProductionMode ? 180_000 : 60_000,
+    env: {
+      ...(process.env as Record<string, string>),
+      // See server/env.ts's boot-time guard (v1.4): `next build`/`next
+      // start` refuse to run under NODE_ENV=production without this. This
+      // e2e run is exactly the kind of controlled, non-public environment
+      // the escape hatch exists for.
+      ...(isProductionMode ? { PREAUTH_MODE_ACKNOWLEDGED: "true" } : {}),
+    },
   },
 });

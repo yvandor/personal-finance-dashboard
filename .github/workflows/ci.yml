@@ -147,6 +147,18 @@ jobs:
         env:
           CI: true
 
+      # Runs after the step above, never alongside it -- see
+      # playwright.config.ts's comment on why the dev-server suite and this
+      # production-build suite must not run concurrently (both would fight
+      # over .next). GitHub Actions steps are sequential by default, so this
+      # is safe as a separate step in the same job rather than a separate
+      # job. This is the ONLY CI coverage for the offline-fallback test --
+      # the single most important test in the whole v1.4 PWA slice.
+      - name: Run PWA production-build E2E suite (service worker + offline fallback)
+        run: npm run test:e2e:pwa
+        env:
+          CI: true
+
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
