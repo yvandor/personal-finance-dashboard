@@ -7,17 +7,18 @@ import type { MetadataRoute } from "next";
 //
 // background_color/theme_color mirror app/globals.css's light-mode
 // --accent (#4f46e5) -- a manifest has no media-query variant, so this
-// picks the same single fixed color app/icon.tsx's placeholder icon uses,
-// consistent with app/layout.tsx's viewport.themeColor light-mode entry.
+// picks the same single fixed color lib/icon-mark.tsx's artwork is built
+// on, consistent with app/layout.tsx's viewport.themeColor light-mode entry.
 //
-// icons: reference app/icon.tsx's two generateImageMetadata sizes
-// (/icon/192, /icon/512 -- see that file's `id` handling) plus one
-// maskable-purpose entry at 512x512 for Android's adaptive-icon masking
-// (maskable icons need extra safe-zone padding around the visible glyph;
-// app/icon.tsx's borderRadius-only placeholder is a close-enough
-// approximation for this placeholder-icon slice, not a pixel-perfect
-// maskable-safe-zone icon -- fine to revisit whenever the real icon
-// design lands).
+// icons: reference app/icon.tsx's three generateImageMetadata entries (see
+// that file's `id` handling). /icon/192 and /icon/512 are the unmasked
+// `purpose: "any"` artwork; /icon/512-maskable is a separate drawing on the
+// same 512px canvas, full bleed with its mark held inside Android's 80%
+// adaptive-icon safe zone. The maskable entry deliberately does NOT reuse
+// /icon/512: an icon that satisfies the mask and an icon that is displayed
+// unmasked have opposite requirements, so pointing both purposes at one
+// image guarantees one of them is wrong (it used to point here, approximated
+// by the old placeholder's corner rounding).
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Finance Dashboard",
@@ -30,7 +31,7 @@ export default function manifest(): MetadataRoute.Manifest {
     icons: [
       { src: "/icon/192", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon/512", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon/512-maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

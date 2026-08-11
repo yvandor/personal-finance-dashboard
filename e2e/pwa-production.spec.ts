@@ -37,6 +37,65 @@ test.describe("Service worker registration", () => {
   });
 });
 
+test.describe("Generated icons under a production build", () => {
+  // e2e/pwa.spec.ts already follows every manifest icon src against the dev
+  // server. This covers the two things only a real build can show:
+  //
+  // 1. app/icon.tsx's generateImageMetadata ids are emitted as routes by
+  //    `next build`, not merely resolved on demand by `next dev`. A bad or
+  //    renamed id is a 404 that dev mode can hide.
+  // 2. The icons still resolve once the service worker is active. Icon paths
+  //    are the one place lib/sw-strategy.ts hands back "static" (cache-first)
+  //    instead of the network-only default, so these requests go down a code
+  //    path in public/sw.js that no other test exercises with real bytes.
+  //
+  // Deliberately fetched from inside the page rather than via
+  // page.request.get(): an APIRequestContext request never passes through
+  // the service worker, which would skip the only part of this that is
+  // production-specific. Decoding each response as an Image is also a
+  // stronger check than a Content-Type header -- a cache-first path that
+  // returned a truncated or wrong-typed body would still claim image/png.
+  test("every manifest icon decodes at its declared size when served through the active service worker", async ({
+    page,
+    context,
+  }) => {
+    const cookie = seedE2ESession();
+    await context.addCookies([cookie]);
+    await page.goto("/dashboard");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+
+    const manifest = await (await page.request.get("/manifest.webmanifest")).json();
+    const declared = (manifest.icons as { src: string; sizes: string }[]).map(({ src, sizes }) => ({ src, sizes }));
+    expect(declared.length).toBeGreaterThan(0);
+
+    const decoded = await page.evaluate(async (icons) => {
+      return Promise.all(
+        icons.map(async ({ src, sizes }) => {
+          const response = await fetch(src);
+          if (!response.ok) return { src, sizes, actual: `HTTP ${response.status}` };
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          try {
+            const image = new Image();
+            const size = await new Promise<string>((resolve) => {
+              image.onload = () => resolve(`${image.naturalWidth}x${image.naturalHeight}`);
+              image.onerror = () => resolve("decode failed");
+              image.src = url;
+            });
+            return { src, sizes, actual: size };
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        }),
+      );
+    }, declared);
+
+    for (const icon of decoded) {
+      expect(icon.actual, `${icon.src} should decode as a ${icon.sizes} image`).toBe(icon.sizes);
+    }
+  });
+});
+
 test.describe("Offline fallback -- core safety requirement", () => {
   // The single most important test in this entire v1.4 version: a finance
   // app must never show a stale or wrong balance while offline. Confirms

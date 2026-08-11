@@ -1,68 +1,53 @@
 import { ImageResponse } from "next/og";
+import { IconArtwork, type IconVariant } from "@/lib/icon-mark";
 
-// Placeholder app icon, procedurally generated -- no design assets exist in
-// this repo yet (see public/ -- just create-next-app's default SVGs). A
-// real icon can replace this file later without touching app/manifest.ts's
-// `icons` array (it references this route by path, not by file contents)
-// or anything else in the PWA slice.
+// The app's generated icon routes. The artwork itself lives in
+// lib/icon-mark.tsx, shared with app/apple-icon.tsx -- see that module's
+// header for why the mark is drawn from divs instead of a text glyph.
 //
-// Two sizes via generateImageMetadata (192x192, 512x512) rather than one
-// icon.tsx default size: app/manifest.ts's `icons` array wants both for
-// Android's install prompt / adaptive-icon masking, and generating two real
-// distinctly-sized images (rather than one image referenced twice under two
-// different declared `sizes`) keeps the manifest's claims about the assets
-// actually true.
-const SIZES = {
-  small: { width: 192, height: 192 },
-  large: { width: 512, height: 512 },
-} as const;
+// Three entries via generateImageMetadata rather than one icon.tsx default
+// size. 192 and 512 are what app/manifest.ts's `icons` array needs for
+// Android's install prompt, and generating two genuinely distinct images
+// (rather than one image referenced twice under two different declared
+// `sizes`) keeps the manifest's claims about the assets actually true.
+//
+// "512-maskable" is not a third size -- it is the same 512px canvas
+// carrying a different drawing. An icon that satisfies Android's
+// adaptive-icon mask must be full bleed with its mark inside an 80% safe
+// zone, which is the direct opposite of what the unmasked `purpose: "any"`
+// icon wants (its own corner rounding, and a mark big enough to not look
+// lost). Serving one image for both purposes means one of them is wrong;
+// the cost of serving both correctly is this one extra entry plus one src
+// string in app/manifest.ts.
+//
+// Adding an id here needs no service-worker change, which is the only
+// reason it is a safe thing to do casually: lib/sw-strategy.ts (and the
+// hand-written copy of its rules in public/sw.js) classifies the entire
+// `/icon/` path prefix as a cacheable static asset, so a new id is covered
+// the day it exists. Nothing about the network-only default for financial
+// routes is involved here.
+const ICONS = {
+  "192": { size: 192, variant: "any" },
+  "512": { size: 512, variant: "any" },
+  "512-maskable": { size: 512, variant: "maskable" },
+} as const satisfies Record<string, { size: number; variant: IconVariant }>;
 
 export function generateImageMetadata() {
-  return [
-    { id: "192", size: SIZES.small, contentType: "image/png" },
-    { id: "512", size: SIZES.large, contentType: "image/png" },
-  ];
+  return Object.entries(ICONS).map(([id, { size }]) => ({
+    id,
+    size: { width: size, height: size },
+    contentType: "image/png",
+  }));
 }
 
-// #4f46e5 / #ffffff -- this app's light-mode --accent / --accent-foreground
-// tokens (app/globals.css). Deliberately not the dark-mode pair: a home
-// screen icon has no ambient page background to auto-switch against, so it
-// picks one fixed brand color the same way most installed-app icons do.
-const ACCENT = "#4f46e5";
-const ACCENT_FOREGROUND = "#ffffff";
-
 export default async function Icon({ id }: { id: Promise<string | number> }) {
-  const iconId = await id;
-  const { width, height } = iconId === "512" ? SIZES.large : SIZES.small;
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: ACCENT,
-          // A little corner rounding reads as an app icon rather than a
-          // plain color swatch, while staying well inside the "safe zone"
-          // Android's adaptive-icon masking needs (see manifest's
-          // maskable icon entry).
-          borderRadius: width * 0.18,
-        }}
-      >
-        <span
-          style={{
-            fontSize: width * 0.58,
-            fontWeight: 700,
-            color: ACCENT_FOREGROUND,
-            fontFamily: "sans-serif",
-          }}
-        >
-          $
-        </span>
-      </div>
-    ),
-    { width, height },
-  );
+  const iconId = String(await id) as keyof typeof ICONS;
+  // Falls back to the smallest icon for an id Next never generated, same as
+  // the previous implementation's ternary did: a hand-typed or stale /icon
+  // URL should not be a 500.
+  const { size, variant } = ICONS[iconId] ?? ICONS["192"];
+  return new ImageResponse(<IconArtwork size={size} variant={variant} />, {
+    width: size,
+    height: size,
+  });
 }
