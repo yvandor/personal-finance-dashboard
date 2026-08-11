@@ -6,6 +6,7 @@ A privacy-first, manual-entry personal finance tracker. Log income and expenses,
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7.9-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Auth.js](https://img.shields.io/badge/Auth.js-v5-000000?logo=auth0&logoColor=white)](https://authjs.dev/)
 [![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![CI](https://github.com/yvandor/personal-finance-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/yvandor/personal-finance-dashboard/actions/workflows/ci.yml)
 
@@ -43,8 +44,9 @@ Currently implemented (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 f
 - **iPhone/mobile polish** — every real form field is ≥16px to avoid Safari's input-zoom-on-focus, icon-only row actions meet a ~44px tap target, and dialogs correctly lock background scroll (all found and fixed via real device-viewport and interaction testing, not assumed)
 - **Accessible, resilient forms** — labels tied to inputs, validation errors wired via `aria-describedby`/`aria-invalid`, and a failed submission never discards what you typed
 - **Per-user data isolation by construction** — every query is scoped through a single `requireUserId()` seam; no code path anywhere accepts a `userId` from the client
+- **Real authentication (Auth.js v5)** — sign in with GitHub OAuth, gated by an explicit, fail-closed email allowlist (no self-serve sign-up); database-strategy sessions for instant server-side revocation; every protected route redirects an unauthenticated visitor to `/sign-in` and back to where they started — see [Authentication](#authentication) below
 
-Not yet built — see [Roadmap](#roadmap) below: authentication.
+See [Roadmap](#roadmap) below for what's still not built.
 
 ## Screenshots
 
@@ -84,6 +86,17 @@ flowchart TD
 **Client-side optimism:** each list page (`/transactions`, `/budgets`, `/goals`, `/categories`, `/income`, `/bills`) has one client `*Board.tsx` component that owns a `useOptimistic` overlay shared by its header's create dialog and the list below it, threaded down to row-level edit/delete via plain optional callback props (no Context needed at that scale). Deletion additionally routes through a small shared `ToastProvider` (`components/ui/ToastProvider.tsx`) — the one place this app *does* use Context, since a toast is a genuinely cross-page concern — which holds the real delete for a few seconds so clicking Undo never touches the server at all. `/history` is the one list page with no Board: it's read-only, so there's nothing to optimistically update.
 
 **Mobile navigation:** `NAV_ITEMS` (`lib/navigation.ts`) is the single source of truth for both the desktop sidebar (rendered inline in the Server Component `layout.tsx`) and the mobile drawer (`components/layout/MobileNav.tsx`, a Client Component built on the same native-`<dialog>`-plus-`showModal()` pattern as `Modal.tsx`) — one list, so the two surfaces can't drift out of sync.
+
+## Authentication
+
+Real authentication (Auth.js v5 / `next-auth@5.0.0-beta.32` + `@auth/prisma-adapter`) landed in v1.5, replacing the single shared `DEV_USER_ID` identity every earlier version ran as. The whole app was already funneled through one function — `requireUserId()` (`server/context.ts`) — from the very first migration specifically so this swap would touch nothing else: no DAL function, Server Action, or page changed.
+
+- **Provider**: GitHub OAuth only — no Credentials provider, so there's no password storage or reset flow to build or secure.
+- **Sign-in allowlist**: this app has no self-serve sign-up. `lib/auth.ts`'s `isAllowedSigninEmail()` checks the signed-in GitHub account's email against a comma-separated `ALLOWED_SIGNIN_EMAILS` env var, enforced in `server/auth.ts`'s `signIn` callback on **every** sign-in attempt (not just account creation) — removing an email from the list takes effect immediately. An empty or unset allowlist rejects everyone; it fails closed, never open.
+- **Sessions**: database-strategy, not JWT — `@auth/prisma-adapter`'s `Session` model, giving instant server-side revocation (sign-out deletes the row) and session-rotation-on-sign-in as a free session-fixation mitigation. The DB is already in the request path via `requireUserId()` on every request regardless.
+- **Route protection**: `proxy.ts` (Next 16's renamed `middleware.ts`, running on the Node.js runtime — not the historical edge runtime that used to require a separate edge-safe config split) redirects an unauthenticated request to `/sign-in?callbackUrl=<original path>` for any route not on its small public allowlist (`/sign-in`, `/api/auth/*`, `/api/health`, `/offline`, manifest/icon/favicon/`sw.js`). This is UX-only, by design — `requireUserId()` is the real, independent authorization boundary on every request, with or without `proxy.ts`.
+- **Local development without real GitHub OAuth credentials**: `ALLOW_DEV_AUTH_BYPASS=true` (combined with `NODE_ENV !== "production"` — both required, neither implied by the other) makes `requireUserId()` fall back to the fixed `DEV_USER_ID`, exactly like every earlier version's only mode. There is **no equivalent bypass in production** — see [Security](#security).
+- **Sign out**: `components/auth/SignOutButton.tsx`, a Server Component `<form>` bound to Auth.js's `signOut` Server Action, in both the desktop sidebar and the mobile drawer.
 
 ## PWA & offline behavior
 
@@ -129,27 +142,32 @@ lib/**               Dependency-free: money math (lib/money.ts), Zod schemas (li
 web/
 ├── app/
 │   ├── (dashboard)/
-│   │   ├── layout.tsx            # sidebar (desktop) / mobile-drawer-triggering top bar, mounts ToastProvider
+│   │   ├── layout.tsx            # sidebar (desktop) / mobile-drawer-triggering top bar, mounts ToastProvider, sign-out
 │   │   ├── transactions/, budgets/, goals/, categories/, income/, bills/, history/, dashboard/
 │   │   │   ├── page.tsx          # Server Component: reads searchParams, calls the DAL
 │   │   │   ├── loading.tsx
 │   │   │   └── error.tsx
-│   ├── api/health/route.ts       # GET liveness check for uptime monitoring -- no DB, no auth, nothing to protect
+│   ├── sign-in/page.tsx          # public sign-in page -- GitHub OAuth button, callbackUrl passthrough
+│   ├── api/auth/[...nextauth]/route.ts   # Auth.js's own route handler (GET/POST), re-exported
+│   ├── api/health/route.ts       # GET liveness check for uptime monitoring -- public, nothing to protect
 │   ├── manifest.ts                # Next file-convention web app manifest -> /manifest.webmanifest
 │   ├── icon.tsx, apple-icon.tsx   # Next file-convention dynamic icons (ImageResponse) -> /icon/*, /apple-icon
 │   ├── offline/page.tsx          # PWA offline fallback -- zero data fetching, zero financial figures, on purpose
 │   ├── layout.tsx                # root shell; mounts ServiceWorkerRegistration
 │   ├── globals.css               # Tailwind v4 @theme tokens + safe-area-inset custom properties/utilities
 │   └── page.tsx                  # redirects "/" -> "/transactions"
+├── proxy.ts                      # Next 16's middleware.ts -- UX-only redirect to /sign-in, never the auth boundary
 ├── server/
 │   ├── db.ts                     # PrismaClient singleton (driver adapter)
+│   ├── auth.ts                   # Auth.js v5 config -- GitHub provider, database sessions, allowlist callback
 │   ├── context.ts                # requireUserId() — the sole auth seam
-│   ├── env.ts                    # Zod-validated server environment + the pre-auth production boot guard
+│   ├── env.ts                    # Zod-validated server environment + the production auth-configured boot guard
 │   ├── data/                     # DAL — only place `prisma` is imported; ESLint-enforced
 │   │   ├── transactions.ts, budgets.ts, savingsGoals.ts, categories.ts, incomeSources.ts,
 │   │   │   recurringBills.ts, history.ts, dashboard.ts, users.ts
 │   └── actions/                  # 'use server' mutations, one file per resource
 ├── lib/
+│   ├── auth.ts                   # isAllowedSigninEmail() -- the sign-in allowlist, pure and independently unit-tested
 │   ├── money.ts                  # parseMoneyToCents / formatCents — the only arithmetic site
 │   ├── result.ts                 # ActionResult<T>
 │   ├── errors.ts                 # NotFoundError / ValidationError
@@ -162,12 +180,17 @@ web/
 │   └── schemas/                  # Zod: create/update/filter schemas per resource
 ├── components/
 │   ├── ui/                       # Button, Modal (now with a body-scroll lock), ConfirmDialog, Money, Toast, ToastProvider
+│   ├── auth/                     # SignOutButton -- Server Component, form bound to Auth.js's signOut action
 │   ├── layout/                   # MobileNav — the slide-over drawer, built on native <dialog>
 │   ├── pwa/                      # ServiceWorkerRegistration -- mounted once in the root layout, renders nothing
 │   └── transactions/, budgets/, goals/, categories/, income/, bills/, history/
 │       │                          # form, dialog, row/card, and one *Board.tsx per resource
 │       │                          # (owns the useOptimistic overlay -- see Architecture overview;
 │       │                          # history/ has no Board -- it's read-only)
+├── types/
+│   └── next-auth.d.ts            # module augmentation -- adds Session.user.id
+├── scripts/
+│   └── backfill-owner.ts         # one-time, dry-run-by-default: reassigns DEV_USER_ID's rows to a real signed-in user
 ├── public/
 │   └── sw.js                     # the service worker itself -- plain script, hand-kept in sync with lib/sw-strategy.ts
 ├── prisma/
@@ -175,18 +198,18 @@ web/
 │   ├── migrations/
 │   └── seed.ts                   # dev user + default categories
 ├── tests/
-│   ├── unit/                     # pure logic (Zod schemas, money/date/progress/pace/status math, reducers)
+│   ├── unit/                     # pure logic (Zod schemas, money/date/progress/pace/status math, reducers, auth allowlist)
 │   │   └── components/           # React Testing Library, one file per component
-│   └── integration/               # real Postgres — CRUD + cross-user isolation, per DAL
+│   └── integration/               # real Postgres — CRUD + cross-user isolation (DAL- and Server-Action-level), per DAL
 ├── e2e/                          # Playwright critical-path specs, one per resource, plus mobile-nav/mobile-audit/
-│   │                              # pwa/health specs; pwa-production.spec.ts and cache-headers.spec.ts run only
-│   │                              # under `npm run test:e2e:pwa` (need a real production build)
+│   │                              # pwa/health/auth/cross-user specs; pwa-production.spec.ts and cache-headers.spec.ts
+│   │                              # run only under `npm run test:e2e:pwa` (need a real production build)
 └── .github/
     ├── workflows/ci.yml
     └── dependabot.yml
 ```
 
-`prisma/schema.prisma` now has a full DAL, Server Actions, and UI for every model it defines: `Category`, `Transaction`, `Budget`, `SavingsGoal`/`SavingsContribution`, `IncomeSource`, and `RecurringBill`/`RecurringBillPayment`.
+`prisma/schema.prisma` now has a full DAL, Server Actions, and UI for every model it defines: `Category`, `Transaction`, `Budget`, `SavingsGoal`/`SavingsContribution`, `IncomeSource`, `RecurringBill`/`RecurringBillPayment`, plus `User`/`Account`/`Session`/`VerificationToken` (Auth.js's standard `@auth/prisma-adapter` schema, v1.5).
 
 ## Installation
 
@@ -214,7 +237,36 @@ npm install
    npm run db:seed
    ```
 
-There is no authentication yet (see [Roadmap](#roadmap)). Every request acts as one fixed user, resolved from the `DEV_USER_ID` environment variable through a single seam (`server/context.ts`) — see that file's comments for how this is designed to be a drop-in swap for real session-based auth later, without touching any query in the app.
+## Authentication setup
+
+Real authentication (see [Authentication](#authentication) above) needs a few more env vars in `.env`. Two ways to run this locally:
+
+**Option A — skip real OAuth entirely (fastest for local dev).** Set:
+
+```bash
+DEV_USER_ID=dev-user
+ALLOW_DEV_AUTH_BYPASS=true
+```
+
+Every request resolves to the fixed `DEV_USER_ID`, same as every version before v1.5 — no GitHub OAuth App, no real sign-in flow. `AUTH_SECRET` is still required unconditionally (Auth.js checks it at request time regardless of the bypass) — any random string works locally:
+
+```bash
+AUTH_SECRET=$(openssl rand -base64 32)   # or any long random string
+```
+
+**Option B — exercise the real sign-in flow.**
+
+1. Create a GitHub OAuth App: [github.com/settings/developers](https://github.com/settings/developers) → *New OAuth App*. Homepage URL: `http://localhost:3000`. Authorization callback URL: `http://localhost:3000/api/auth/callback/github`.
+2. Set in `.env`:
+   ```bash
+   AUTH_SECRET=<generate as above>
+   AUTH_GITHUB_ID=<the OAuth App's Client ID>
+   AUTH_GITHUB_SECRET=<a generated Client Secret>
+   ALLOWED_SIGNIN_EMAILS=you@example.com   # comma-separated; must include your GitHub account's email
+   ```
+3. Leave `ALLOW_DEV_AUTH_BYPASS` unset (or `false`) so requests actually go through the real sign-in flow.
+
+`server/env.ts` Zod-validates all of this at first import — a missing/empty required variable fails loudly, naming which one, before any request is served.
 
 ## Local development
 
@@ -222,7 +274,7 @@ There is no authentication yet (see [Roadmap](#roadmap)). Every request acts as 
 npm run dev
 ```
 
-Visit `http://localhost:3000` — it redirects to `/transactions`. `/dashboard`, `/budgets`, `/bills`, `/income`, `/goals`, `/categories`, and `/history` are also live routes.
+Visit `http://localhost:3000` — it redirects to `/transactions` (or to `/sign-in` first, if you're not using the dev bypass and haven't signed in yet). `/dashboard`, `/budgets`, `/bills`, `/income`, `/goals`, `/categories`, and `/history` are also live routes.
 
 ## Running tests
 
@@ -238,7 +290,7 @@ tests/
                      No mocking of Prisma — including the cross-user data-isolation suite.
 ```
 
-As of this writing: **646 Vitest tests** (unit + component + integration, via `npm run test`) plus **43 Playwright E2E tests** across two suites (33 against the dev server via `npm run test:e2e`, 10 against a real production build via `npm run test:e2e:pwa` — see [End-to-end tests](#end-to-end-tests) below) — 689 automated tests total, all passing in CI on every push (`ci` and `e2e` jobs).
+As of this writing: **695 Vitest tests** (unit + component + integration, via `npm run test`) plus **49 Playwright E2E tests** across two suites (39 against the dev server via `npm run test:e2e` — 37 running, 2 self-skipping when the dev auth bypass makes their assertion unobservable, see [End-to-end tests](#end-to-end-tests) — and 10 against a real production build via `npm run test:e2e:pwa`) — 744 automated tests total, all passing in CI on every push (`ci` and `e2e` jobs).
 
 `vitest.config.mts` loads `.env.test` and sets the `react-server` module-resolution condition that `server-only`-guarded files need outside of Next's own bundler. Integration tests wipe and reseed a fixed dev user and a second test user before each test (`tests/setup.ts`) — point `.env.test` at a database that's safe to truncate.
 
@@ -252,7 +304,7 @@ npm run test:coverage
 
 ## End-to-end tests
 
-A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, income sources (including tagging a transaction and the expected-vs-received number updating), recurring bills (including the atomic mark-paid-and-log-a-transaction flow), month-to-month history, the dashboard, mobile navigation and iPhone-viewport usability, and dialog accessibility/focus behavior — in a real browser against a real running app.
+A Playwright smoke suite (`e2e/`) exercises the critical journeys — transactions CRUD and validation, budgets CRUD with live progress, income sources (including tagging a transaction and the expected-vs-received number updating), recurring bills (including the atomic mark-paid-and-log-a-transaction flow), month-to-month history, the dashboard, mobile navigation and iPhone-viewport usability, dialog accessibility/focus behavior, and authentication (`e2e/auth.spec.ts`, `e2e/cross-user.spec.ts`) — in a real browser against a real running app.
 
 ```bash
 cp .env.e2e.example .env.e2e   # a THIRD database, separate from finance_dev and .env.test's
@@ -262,7 +314,9 @@ npm run test:e2e
 
 `playwright.config.ts` loads `.env.e2e` and starts the app itself (`next dev`) on a dedicated port (3100), always fresh (`reuseExistingServer: false`) — reusing "whatever's already running" is exactly how an E2E run could end up silently pointed at a real `npm run dev` session against `finance_dev` instead; the separate port makes that structurally impossible rather than a config convention to trust. `e2e/global-setup.ts` applies migrations; every spec resets and reseeds a fixed category set before each test (`e2e/fixtures.ts`) using its own distinct identity (`DEV_USER_ID=e2e-dev-user`), and `e2e/global-teardown.ts` leaves the database fully empty when the suite finishes. The suite runs fully serial (`workers: 1`) — this app has exactly one identity and no per-test tenancy (see `server/context.ts`), so order-independence comes from resetting to a known state before every test, not from parallel isolation the app doesn't have yet.
 
-The generated Prisma client (`app/generated/prisma`) is ESM-only, which conflicts with Playwright Test's CJS-oriented module loader — `e2e/` has its own nested `package.json` (`{"type": "module"}`) so Node treats files there as ESM, and the two scripts that actually touch the database (`e2e/reset-data.ts`, `e2e/wipe-data.ts`) run as fully separate child processes rather than being imported into Playwright's own process, sidestepping the interop issue entirely.
+The generated Prisma client (`app/generated/prisma`) is ESM-only, which conflicts with Playwright Test's CJS-oriented module loader — `e2e/` has its own nested `package.json` (`{"type": "module"}`) so Node treats files there as ESM, and the scripts that actually touch the database (`e2e/reset-data.ts`, `e2e/wipe-data.ts`, `e2e/seed-session.ts`, `e2e/seed-second-user-data.ts`) run as fully separate child processes rather than being imported into Playwright's own process, sidestepping the interop issue entirely.
+
+**Authentication in the E2E suite:** `playwright.config.ts`'s webServer sets `ALLOW_DEV_AUTH_BYPASS=true`, which is what keeps every pre-v1.5 spec passing unchanged — they all exercise the app as the fixed dev-bypass identity, not a real signed-in session. Two auth-specific assertions in `e2e/auth.spec.ts` (the unauthenticated-redirect and post-sign-out-redirect checks) are structurally unobservable while that bypass is active — they detect this and `test.skip()` with an explicit reason rather than asserting something that can't currently pass; a future no-bypass webServer mode would let them assert for real with no changes needed. Everything else auth-related — a real seeded database session reaching a protected route, and both `e2e/cross-user.spec.ts` tests — doesn't share this limitation: `requireUserId()` checks a real Auth.js session *before* ever consulting the bypass, so seeding one via `e2e/seed-session.ts` (a real `Session` row, not the bypass) is fully observable under the normal dev-mode run. `seed-session.ts` also accepts an optional second `{userId, email}`, letting `cross-user.spec.ts` authenticate two independent, real identities in the same run.
 
 ### Production-build E2E suite (`npm run test:e2e:pwa`)
 
@@ -273,6 +327,8 @@ npm run test:e2e:pwa
 ```
 
 This sets `E2E_MODE=production` (via `cross-env`, since a plain `VAR=value` prefix doesn't work under `npm run` on Windows, where it shells out through `cmd.exe`), which swaps `playwright.config.ts` over to a dedicated production `webServer` (`next build && next start`, on the same port 3100) and a project that runs only those two files. The two modes are never invoked in the same process — a production build and `next dev` both read/write the same `.next` directory, so running them concurrently risks one corrupting the other's state, on top of the dev suite paying a full build's cost for tests that don't need it. CI runs this as its own sequential step, after the main suite, in the same job. The offline-fallback test in `pwa-production.spec.ts` is the single most important test in this entire codebase — see [PWA & offline behavior](#pwa--offline-behavior) above.
+
+`ALLOW_DEV_AUTH_BYPASS` has no effect under `NODE_ENV=production` — `requireUserId()` deliberately never honors it there, on purpose (see [Security](#security)), so both production-only specs authenticate the same way `e2e/cross-user.spec.ts` does: a real database session seeded via `e2e/seed-session.ts` and set as a cookie, exercising the exact auth path real production traffic goes through, not a bypass. `playwright.config.ts`'s production webServer sets its own throwaway `AUTH_SECRET`/`AUTH_URL`/`AUTH_GITHUB_ID`/`AUTH_GITHUB_SECRET`/`ALLOWED_SIGNIN_EMAILS` so the boot-time guard (`server/env.ts`) is satisfied — none of those values are ever actually exercised, since no spec goes through real GitHub OAuth.
 
 ## CI workflow
 
@@ -292,7 +348,9 @@ This sets `E2E_MODE=production` (via `cross-env`, since a plain `VAR=value` pref
 
 Every one of those can be run locally in the same order — see the table above. The only thing CI doesn't cover is a manual smoke test against the long-lived local dev database, which is a deliberate call: the integration suite already exercises the same code paths against a real database on every run.
 
-A separate `e2e` job runs the Playwright suite in parallel with the job above (its own Postgres service container, `finance_e2e`), installing only Chromium and uploading the HTML report as an artifact on failure only. That job runs `npx playwright test` (the dev-server suite) and then, as a sequential second step, `npm run test:e2e:pwa` (the production-build suite — see [Production-build E2E suite](#production-build-e2e-suite-npm-run-teste2epwa) above) with `PREAUTH_MODE_ACKNOWLEDGED=true` set at the job level for that build to succeed at all.
+The `ci` job's `Build` step forces `NODE_ENV=production` (`next build` always does this internally), which trips `server/env.ts`'s `assertProductionAuthConfigured()` guard (see [Security](#security)) — its `env:` block sets throwaway `AUTH_SECRET`/`AUTH_GITHUB_ID`/`AUTH_GITHUB_SECRET`/`ALLOWED_SIGNIN_EMAILS` values so that step succeeds, the same "container-local, never used outside this job" spirit as its `DATABASE_URL`/`DEV_USER_ID`.
+
+A separate `e2e` job runs the Playwright suite in parallel with the job above (its own Postgres service container, `finance_e2e`), installing only Chromium and uploading the HTML report as an artifact on failure only. That job runs `npx playwright test` (the dev-server suite) and then, as a sequential second step, `npm run test:e2e:pwa` (the production-build suite — see [Production-build E2E suite](#production-build-e2e-suite-npm-run-teste2epwa) above); `playwright.config.ts`'s own webServer env already supplies everything that production build needs.
 
 **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) opens a weekly PR for outdated `npm` and `github-actions` dependencies — those PRs still have to pass the full CI pipeline above, including the audit gate, before merging.
 
@@ -306,29 +364,41 @@ A separate `e2e` job runs the Playwright suite in parallel with the job above (i
 
 ## Security
 
-- **No `userId` ever accepted from the client.** The sole source of the acting user is `requireUserId()` (`server/context.ts`) — no Server Action, DAL function, or Zod schema has a `userId` parameter or field for a caller to spoof.
+- **Real authentication, not a fixed identity.** `requireUserId()` (`server/context.ts`) resolves the real signed-in user from Auth.js's session — no Server Action, DAL function, or Zod schema has a `userId` parameter or field for a caller to spoof, and there is no code path that lets a request choose who it acts as. See [Authentication](#authentication) above.
+- **Sign-in is allowlisted and fails closed.** `lib/auth.ts`'s `isAllowedSigninEmail()` — an empty or unset `ALLOWED_SIGNIN_EMAILS` rejects every sign-in attempt rather than defaulting open; the check runs on every sign-in, not just account creation.
+- **No pre-auth escape hatch in production, of any kind.** `server/env.ts`'s `assertProductionAuthConfigured()` hard-requires `AUTH_SECRET`, `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`, and `ALLOWED_SIGNIN_EMAILS` whenever `NODE_ENV=production` — missing any one refuses the build/start outright, naming exactly which. `ALLOW_DEV_AUTH_BYPASS` (the local-dev-only fallback to `DEV_USER_ID`) is independently gated on `NODE_ENV !== "production"` as well, so even setting it can't affect a production process. v1.4's `PREAUTH_MODE_ACKNOWLEDGED` override existed for exactly one reason — the app had no real auth yet — and was **removed** (not tightened) in v1.5 once authentication was verified end-to-end; there is no equivalent override for this guard.
+- **Open-redirect guarded on the sign-in page.** `app/sign-in/page.tsx`'s `callbackUrl` (set by `proxy.ts` on redirect, but rendered from whatever an unauthenticated visitor's URL actually contains) is only honored if it's a same-origin path starting with a single `/` — a crafted `//evil.com` or absolute URL falls back to a safe default instead.
+- **Cross-user isolation is tested at two layers.** `tests/integration/*.test.ts` exercises every DAL function directly (mocking `requireUserId()` to swap identity) *and* the actual `server/actions/*.ts` Server Actions with forged FormData (an id/categoryId belonging to another user), confirming both layers return a clean "not found" result — never a crash, never a leak. `e2e/cross-user.spec.ts` repeats this through the real UI with two genuinely independent signed-in identities. A database-level backstop reinforces the application checks for the category↔transaction/budget relationship specifically (`transactions_category_same_owner`/`budgets_category_same_owner`, composite `(categoryId, userId)` foreign keys — see `prisma/schema.prisma`); the audit that added this test coverage also confirmed the remaining relations (`SavingsContribution`→`SavingsGoal`, `Transaction`→`IncomeSource`, `RecurringBillPayment`→`RecurringBill`) rely on application-level `{ id, userId }` checks only, with no equivalent DB-level constraint — a defense-in-depth gap noted for a future pass, not a live vulnerability (every access path is still correctly scoped).
 - **Ownership is part of the write query itself**, not a separate check-then-write step: mutations use `updateMany`/`deleteMany` with `{ id, userId }` in the `where` clause, so there's no race between an ownership check and the write.
 - **`.strict()` Zod schemas** on every mutation reject unknown keys outright — the mass-assignment guard — rather than silently stripping them.
 - **Server-side validation is the only enforcement point that counts**; any client-side validation is UX only, and every Server Action re-parses input from scratch.
 - **Money is integer cents end to end** — no floats in storage, computation, or over-the-wire payloads — eliminating an entire class of rounding/precision bugs in a domain where they're unacceptable.
 - **No secrets committed** — `.env*` is git-ignored except the `*.example` templates, which list variable names only.
 - **The DAL/Prisma import boundary is enforced by ESLint, not just convention** — `@typescript-eslint/no-restricted-imports` (`eslint.config.mjs`) fails the build if anything outside `server/data/**` imports the Prisma client singleton (`@/server/db`) or constructs a `PrismaClient`/adapter directly. Type-only imports of Prisma models/enums are exempted; `server/db.ts` itself, and test/seed/E2E fixtures (`tests/**`, `e2e/**`, `prisma/**`), are the only other exemptions.
-- **Server environment variables are Zod-validated at first import** (`server/env.ts`), not read ad hoc via `process.env.X` — a missing or empty `DATABASE_URL`/`DEV_USER_ID` fails loudly, naming which variable is missing (never its value), instead of surfacing later as a confusing Prisma connection error.
+- **Server environment variables are Zod-validated at first import** (`server/env.ts`), not read ad hoc via `process.env.X` — a missing or empty `DATABASE_URL`/`DEV_USER_ID` fails loudly, naming which variable is missing (never its value), instead of surfacing later as a confusing Prisma connection error. `AUTH_SECRET`/`AUTH_GITHUB_ID`/`AUTH_GITHUB_SECRET`/`ALLOWED_SIGNIN_EMAILS` are validated the same way, hard-required in production (see below).
 - **Production security headers** (`next.config.ts`): a same-origin-by-default Content-Security-Policy, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and a `Permissions-Policy` denying camera/microphone/geolocation. The CSP's `script-src`/`style-src` `'unsafe-inline'` is **not** a dev-only allowance — Next.js 16's App Router injects its own inline bootstrap/hydration `<script>` tags in both dev and production, and real inline `style` attributes are used in production (e.g. `BudgetProgressBar`'s dynamic width, Recharts' SVG styling). Next.js's alternative — per-request CSP nonces via `proxy.ts` — was evaluated and rejected here because it requires forcing every page into dynamic rendering (no static optimization, ISR, or PPR), a real architecture change out of scope for this pass. The two allowances that genuinely are dev-only (`'unsafe-eval'` in `script-src`, the `ws://localhost`/`http://localhost` entries in `connect-src`) are gated on `NODE_ENV` and commented in `next.config.ts` as exactly that. `worker-src 'self'` and `manifest-src 'self'` (v1.4) are stated explicitly for the service worker and web app manifest, rather than relying on their (correct) fallback to `script-src`/`default-src`.
 - **Every data-bearing page sends `Cache-Control: private, no-store`** — found and fixed in v1.4 via a real production-server header check, not assumed: `/categories`, `/bills`, and `/goals` used no dynamic API, so Next statically prerendered them and served them with a **one-year** shared-cache lifetime (`s-maxage=31536000`) despite reading live per-user data. `export const dynamic = "force-dynamic"` on all three fixes it, matching `/transactions`/`/budgets` (already dynamic because they read `searchParams`). `e2e/cache-headers.spec.ts` is the regression guard, run against a real production build (see [End-to-end tests](#end-to-end-tests)) since dev mode doesn't reproduce the same caching behavior. On a real host with a shared/CDN cache (Vercel included), the un-fixed version would have let one stale snapshot serve every visitor for up to a year — and become an actual cross-user data leak the moment real auth and multiple users exist.
-- **Boot-time guard against an unguarded production deploy** (`server/env.ts`, v1.4): `docs/PROJECT_PLAN.md` §8 has always said this app "must never be deployed to a public host ... before authentication lands," but nothing enforced that in code until now. `next build`/`next start` now refuse to run under `NODE_ENV=production` unless `PREAUTH_MODE_ACKNOWLEDGED=true` is also set, with an error naming exactly why. Checked at build time, not just runtime, since `next build` statically prerenders several routes by actually executing their Server Component code — a runtime-only check would let a production bundle get built (and, on some platforms, deployed straight from that step) without anyone acknowledging the gate. CI sets the escape hatch explicitly, as a visible, deliberate acknowledgment, not a default.
+- **Boot-time guard against an unconfigured production deploy** (`server/env.ts`): checked at build time, not just runtime, since `next build` statically prerenders several routes by actually executing their Server Component code — a runtime-only check would let a production bundle get built (and, on some platforms, deployed straight from that step) without the required auth configuration ever being verified. CI's build step and `playwright.config.ts`'s production-mode webServer both supply real-shaped (throwaway) values for every required variable so those builds succeed; see [CI workflow](#ci-workflow).
+- **Session cookies get `Secure` automatically on a real HTTPS deployment**, with no extra configuration — Auth.js derives `useSecureCookies` from the request URL's protocol (confirmed via `@auth/core`'s own source, not assumed). Locally over `http://localhost`, cookies are correctly `HttpOnly; SameSite=Lax` without `Secure`, since a `Secure` cookie wouldn't even be sent over plain HTTP.
+- **`scripts/backfill-owner.ts`** reassigns any existing `DEV_USER_ID`-owned data to a real user's id after their first real sign-in — dry-run by default, requires an explicit `--apply` flag, never guesses the target user, refuses to run against a nonexistent target or when there's nothing to reassign, and performs every table's update inside one transaction (all-or-nothing). Rehearsed against a real database as part of v1.5, which is how a real bug in it was found and fixed: the composite same-owner foreign keys above needed to be `DEFERRABLE INITIALLY IMMEDIATE` (a dedicated migration, zero behavior change for normal application traffic) so the script's transaction can defer their check to commit time via `SET CONSTRAINTS ... DEFERRED` — reassigning either side of that relationship alone always violated the constraint immediately, regardless of statement order, until it was deferrable.
 - **`npm audit --audit-level=high` gates CI** (`.github/workflows/ci.yml`) — a high-or-critical severity advisory anywhere in the dependency tree fails the build. **Dependabot** (`.github/dependabot.yml`) opens weekly PRs for outdated `npm` and `github-actions` dependencies, which still have to pass this same gate.
-- Full threat model, session-strategy recommendations, and the pre-auth deployment gate (**this app must never be deployed to a public host before authentication lands**) are documented in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §8.
+- Full threat model and session-strategy recommendations are documented in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §8.
 
 ## Deploying to Vercel
 
-This app is deployment-ready but has **not** actually been deployed anywhere — v1.4 prepared it for Vercel specifically without changing the "stays private / pre-auth" product gate (see [Security](#security) and [Roadmap](#roadmap)). If and when you do deploy it:
+This app is deployment-ready but has **not** actually been deployed anywhere. As of v1.5 it has real authentication (see [Authentication](#authentication) and [Security](#security)) — the pre-auth "must never serve real traffic" gate from earlier versions is gone, replaced by an actual login. If and when you deploy it:
 
 1. Provision a hosted PostgreSQL database (Vercel Postgres, Neon, and Supabase all work — nothing here is Vercel-Postgres-specific) and run migrations against it: `DATABASE_URL=<your-url> npx prisma migrate deploy`.
-2. In the Vercel project's environment variables, set `DATABASE_URL`, `DEV_USER_ID`, and **`PREAUTH_MODE_ACKNOWLEDGED=true`** — the build (and the running app) will refuse to start without the last one; see [Security](#security)'s boot-time guard.
-3. Restrict who can actually reach the deployment some other way — a Vercel-level password/protection feature, an IP allowlist, or simply not sharing the URL. `PREAUTH_MODE_ACKNOWLEDGED=true` is an acknowledgment that you've done this, not a substitute for it.
-4. No other Vercel-specific configuration is needed — no `vercel.json`, no custom build command. `next build` and `next start` already work exactly as Vercel expects.
-5. Once deployed, `GET /api/health` is available for an external uptime monitor.
+2. Create a GitHub OAuth App ([github.com/settings/developers](https://github.com/settings/developers)) for the real deployment URL: Homepage URL `https://<your-app>.vercel.app`, Authorization callback URL `https://<your-app>.vercel.app/api/auth/callback/github`.
+3. In the Vercel project's environment variables, set:
+   - `DATABASE_URL`, `DEV_USER_ID` (still needed — see [Authentication](#authentication)'s local-dev bypass; harmless in production since the bypass itself is unconditionally disabled there)
+   - `AUTH_SECRET` — a real random secret (`openssl rand -base64 32`), not the throwaway value used in tests/CI
+   - `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` — from the OAuth App created above
+   - `ALLOWED_SIGNIN_EMAILS` — comma-separated; only these accounts can ever sign in
+   - Leave `ALLOW_DEV_AUTH_BYPASS` unset. The build and the running app refuse to start under `NODE_ENV=production` if any of the required auth variables above are missing — see [Security](#security)'s boot-time guard — and there is no override.
+4. Once someone signs in for real for the first time, `scripts/backfill-owner.ts <their-real-user-id>` (dry run first, then `--apply`) reassigns any existing `DEV_USER_ID`-owned data to that real account — see [Security](#security).
+5. No other Vercel-specific configuration is needed — no `vercel.json`, no custom build command. `next build` and `next start` already work exactly as Vercel expects.
+6. Once deployed, `GET /api/health` is available for an external uptime monitor.
 
 Everything above is believed correct but has not been verified against a real Vercel deployment — some details (edge-cache behavior in particular) may need a first real deploy to fully confirm.
 
@@ -336,11 +406,13 @@ Everything above is believed correct but has not been verified against a real Ve
 
 Not yet built:
 
-- [ ] **Authentication (Auth.js)** — deliberately sequenced after the core UI and after v1.4's deployment-readiness pass; the schema and `requireUserId()` seam were designed for this from the first migration, so this becomes a swap of one function's body plus route protection, not a data-model rewrite. This is the one remaining blocker to actually deploying this app publicly — see [Security](#security)'s boot-time guard and [Deploying to Vercel](#deploying-to-vercel).
-- [ ] **Structured logging + error tracking**, **cross-user isolation E2E suite**, **rate limiting on mutations** — the production-readiness items sequenced right after auth
+- [ ] **Structured logging + error tracking**, **rate limiting on mutations** — the remaining production-readiness items, next up now that authentication has shipped
 - [ ] **A real app icon** — v1.4's icon/apple-icon are procedurally generated placeholders (an accent-colored square with a "$"); swappable for a real design without touching `app/manifest.ts` or anything else, since the manifest references the icon route by path, not by file contents
+- [ ] A first real Vercel deployment, to confirm the details noted as unverified in [Deploying to Vercel](#deploying-to-vercel)
 
-**Recently shipped:** An installable PWA (manifest, icons, a service worker that caches only static assets — never a page or financial data — with a safety-first offline fallback), an iPhone/mobile UX pass (input-zoom, tap-target, and scroll-lock fixes), a boot-time guard enforcing the pre-auth deployment gate in code instead of only in docs, a real `Cache-Control` fix on three pages that were being served with a year-long shared-cache lifetime despite reading live data, and Vercel deployment documentation — see [Features](#features), [PWA & offline behavior](#pwa--offline-behavior), and [Deploying to Vercel](#deploying-to-vercel) above.
+**Recently shipped (v1.5):** Real authentication — Auth.js v5, GitHub OAuth, a fail-closed sign-in allowlist, database-strategy sessions — replacing `DEV_USER_ID` as the identity every request resolves to in production (it remains a local-dev/test-only fallback, gated off entirely in production); the v1.4 pre-auth production guard removed (not tightened) now that real auth is verified; a two-layer cross-user isolation audit (DAL-level and Server-Action-level adversarial tests, plus a real-UI E2E suite with two independent identities) and the DB-level backstop gap it found documented in [Security](#security); a one-time backfill script for migrating existing data to a real account after first sign-in — see [Authentication](#authentication), [Security](#security), and [Deploying to Vercel](#deploying-to-vercel) above.
+
+Previously shipped (v1.4): An installable PWA (manifest, icons, a service worker that caches only static assets — never a page or financial data — with a safety-first offline fallback), an iPhone/mobile UX pass (input-zoom, tap-target, and scroll-lock fixes), a real `Cache-Control` fix on three pages that were being served with a year-long shared-cache lifetime despite reading live data — see [Features](#features) and [PWA & offline behavior](#pwa--offline-behavior) above.
 
 Previously shipped: Income sources (`/income` — expected vs. received income tracking), recurring bills (`/bills` — reminder-only due-date tracking with an atomic optional transaction on mark-paid), month-to-month history (`/history`), a mobile navigation drawer, and "copy last month's budgets" on `/budgets`. Two known, intentional simplifications: `IncomeSource.amountCents` is a flat expected-per-occurrence amount (no support for variable-amount income like differing biweekly paychecks), and a bill's "X of Y" ratio on `/history` compares every historical month against *today's* active bill set, since `RecurringBill` has no record of when a bill became active (the same current-state-only limitation `getCurrentMonthBudgetStatus` already accepted).
 
@@ -355,7 +427,7 @@ Deliberately out of MVP scope, tracked in the project plan as post-MVP candidate
 This is currently a solo learning/portfolio project built in explicit, reviewed phases (see [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §10 for the phase breakdown). Issues and suggestions are welcome. If you'd like to contribute code:
 
 1. Open an issue describing the change before sending a large PR — this project follows an explicit plan-then-build process, and unplanned scope (see the plan's "explicitly out of scope" table) will likely be declined.
-2. Run the full local check suite before opening a PR: `npx tsc --noEmit && npx eslint . && npm run test && npm run test:coverage && npm run build`.
+2. Run the full local check suite before opening a PR: `npx tsc --noEmit && npx eslint . && npm run test && npm run test:coverage && npm run build`. The last step (`next build`) forces `NODE_ENV=production` internally and now needs `AUTH_SECRET`/`AUTH_GITHUB_ID`/`AUTH_GITHUB_SECRET`/`ALLOWED_SIGNIN_EMAILS` set in your shell env or `.env` (any values — see [Security](#security)'s boot-time guard); real GitHub OAuth credentials aren't required just to build.
 3. Keep the architecture invariants intact: no `prisma` import outside `server/data/**`, no `userId` accepted as a parameter anywhere, server-side Zod validation on every mutation.
 
 ## License
