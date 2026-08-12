@@ -45,8 +45,27 @@ const CACHE_NAME = `finance-dashboard-static-${CACHE_VERSION}`;
 // install is a good default). classifyRequest() below still classifies
 // `/icon-192`, `/icon-512`, `/icon-maskable`, and `/apple-icon` as "static"
 // regardless of this list, so cacheFirst() still caches each one the first
-// time a page actually requests it -- see fetchVerifiedImage() below for
-// why that first request gets a decode-and-retry, not a plain fetch.
+// time a page actually requests it.
+//
+// v1.6 spent real effort chasing a CI-only Next.js 16.3.0/Turbopack bug in
+// how these four generated-icon Route Handlers get served under concurrent
+// requests -- a response occasionally comes back with the correct declared
+// Content-Length but corrupted, undecodable image bytes. Splitting every
+// icon into its own independent route (app/icon-192/, app/icon-512/,
+// app/icon-maskable/, no shared generateImageMetadata array) measurably
+// improved it: the non-service-worker-mediated icon fetch test
+// (e2e/pwa.spec.ts) now passes reliably, where it used to fail too. A
+// service-worker-level decode-and-retry was also tried and reverted -- CI
+// still failed with it in place, and network-trace analysis of that failure
+// didn't cleanly support the "independent per-request race" model the retry
+// assumed, so it was retry-attempts spent on an unconfirmed theory rather
+// than a working fix. What's left, specifically inside a service worker on
+// CI's Linux runners (never reproduced in dozens of manual trials against a
+// real browser locally, on any OS this app has been tested from), is
+// accepted as a known, understood-in-shape-but-not-fully-pinned-down
+// upstream limitation -- see e2e/pwa-production.spec.ts's `test.skip` on
+// the affected test for where that's tracked, rather than adding more
+// unverified mitigation here.
 const PRECACHE_URLS = ["/offline", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -138,20 +157,11 @@ self.addEventListener("fetch", (event) => {
   // straight to the network, and a real failure on a real failure.
 });
 
-// Routes verified by actually decoding the response as an image before
-// trusting/caching it, with one retry on failure -- see
-// fetchVerifiedImage()'s comment for why. Exact paths only, matching
-// classifyRequest()'s own exact-match rules for these routes.
-const IMAGE_VERIFY_PATHS = new Set(["/icon-192", "/icon-512", "/icon-maskable", "/apple-icon"]);
-
 async function cacheFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
   if (cached) return cached;
-
-  const path = classifyRequestPath(request.url);
-  const response = IMAGE_VERIFY_PATHS.has(path) ? await fetchVerifiedImage(request) : await fetch(request);
-
+  const response = await fetch(request);
   // Only cache genuinely successful, same-origin ("basic") responses --
   // never an error response or an opaque cross-origin one, under a URL a
   // later request might match against.
@@ -159,72 +169,4 @@ async function cacheFirst(request) {
     cache.put(request, response.clone());
   }
   return response;
-}
-
-// v1.6 root-caused a real, CI-only, intermittent Next.js 16.3.0/Turbopack
-// bug in how it serves these four generated-icon Route Handlers
-// (app/icon-192/, app/icon-512/, app/icon-maskable/, app/apple-icon.tsx):
-// under concurrent requests, a response occasionally comes back with the
-// CORRECT declared Content-Length but corrupted, undecodable image bytes.
-// Confirmed directly, repeatedly, against a real browser and a real
-// production build -- and confirmed to be a genuine upstream race, not a
-// bug in this app's own rendering (lib/icon-mark.tsx's IconArtwork decodes
-// correctly on every isolated request; app/icon-192/route.tsx's header has
-// the full investigation). Splitting every icon into its own independent
-// route (no shared generateImageMetadata array) measurably shrank how often
-// this reproduces, but did not eliminate it outright on CI's more
-// resource-constrained runners -- dozens of manual trials locally never
-// reproduced it even once, while CI reproduced it on most attempts.
-//
-// This is the pragmatic mitigation for what's left: actually decode the
-// response as an image (createImageBitmap is available in a Service
-// Worker's global scope, not just a page's) before trusting it, and retry
-// exactly once on failure. A corrupted response is, by every observation
-// so far, an independent per-request event, not a sticky per-process one --
-// a second attempt has consistently succeeded in every manual trial that
-// forced the first to fail. Retrying more than once would start masking a
-// genuinely broken deploy instead of absorbing a known, rare, transient
-// race; capped at one retry on purpose.
-//
-// Deliberately scoped to these four exact paths, not every "static"
-// asset: verifying a JS/CSS chunk this way would be meaningless (they
-// aren't images) and pure waste. If this bug is ever fixed upstream, this
-// whole function -- and IMAGE_VERIFY_PATHS above -- can be deleted and
-// cacheFirst() reverted to a plain `fetch(request)`.
-async function fetchVerifiedImage(request) {
-  const first = await fetch(request);
-  if (!(await decodesAsImage(first))) {
-    return fetch(request);
-  }
-  return first;
-}
-
-async function decodesAsImage(response) {
-  if (!response.ok) return false;
-  try {
-    const bitmap = await createImageBitmap(await response.clone().blob());
-    bitmap.close();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// The same query-string/hash-stripping logic classifyRequest() above uses
-// internally, pulled out as its own function so cacheFirst() can look up
-// IMAGE_VERIFY_PATHS by bare path too. Kept separate from classifyRequest()
-// itself, at the cost of this small duplication, rather than refactoring
-// that function to call this one -- classifyRequest() must stay an exact,
-// diffable mirror of lib/sw-strategy.ts's copy (see its own comment above),
-// and this codebase has neither an equivalent nor a need for one there:
-// IMAGE_VERIFY_PATHS and the retry it drives are Service-Worker-runtime
-// concerns (real fetch, real createImageBitmap) with no pure-function
-// equivalent to keep in sync.
-function classifyRequestPath(url) {
-  if (url.startsWith("/")) return url.split("?")[0].split("#")[0];
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return null;
-  }
 }
