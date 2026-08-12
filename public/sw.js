@@ -32,13 +32,33 @@
 const CACHE_VERSION = "v1";
 const CACHE_NAME = `finance-dashboard-static-${CACHE_VERSION}`;
 
-// The only requests precached at install time: the offline fallback page
-// and this app's icon/manifest routes -- all static, all non-financial.
-// _next/static/* assets are deliberately NOT precached here (their
-// content-hashed filenames aren't knowable from this static script); they
-// get cached opportunistically the first time each one is actually
-// requested, via cacheFirst() below.
-const PRECACHE_URLS = ["/offline", "/manifest.webmanifest", "/icon/192", "/icon/512", "/apple-icon"];
+// Precached at install time: only the offline fallback page and the
+// manifest, both needed the moment install completes so a first-ever
+// offline visit has something to fall back to. _next/static/* assets are
+// deliberately NOT precached here (their content-hashed filenames aren't
+// knowable from this static script); they get cached opportunistically the
+// first time each one is actually requested, via cacheFirst() below.
+//
+// The icon/apple-icon routes (v1.4-v1.6) used to be listed here too, and
+// were removed after a real, CI-reproduced bug: cache.addAll() below fires
+// every PRECACHE_URLS fetch concurrently, racing against the page's own
+// burst of asset requests at the busiest possible moment (right after
+// install, on the very first navigation) -- and in that specific window,
+// requests for the generated icon routes intermittently came back with an
+// empty body (confirmed via e2e/pwa-production.spec.ts's CI failures and
+// their network traces: correct image/png headers, zero content bytes).
+// Every attempt to reproduce it against an on-demand fetch -- sequential,
+// concurrent, cold server, warm server -- succeeded every time; only the
+// install-time addAll() stampede ever produced the corrupted response,
+// which points at request/connection contention during install rather than
+// anything wrong with the icon routes' own rendering (confirmed separately:
+// the same routes decode correctly on every direct, non-precache fetch).
+// Dropping them from PRECACHE_URLS removes that contention entirely --
+// classifyRequest() below still classifies `/icon/*` and `/apple-icon` as
+// "static", so cacheFirst() still caches each one the first time a page
+// actually requests it, same end state, just reached lazily instead of in
+// a forced burst at the worst possible time.
+const PRECACHE_URLS = ["/offline", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

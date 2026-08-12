@@ -1,23 +1,6 @@
 import { ImageResponse } from "next/og";
 import { IconArtwork, type IconVariant } from "@/lib/icon-mark";
 
-// Opts this route out of Next's Full Route Cache. Found by root-causing a
-// real CI failure (e2e/pwa-production.spec.ts's icon-decode test): once a
-// second request hit an already-cached /icon/192, Next 16.3.0/Turbopack
-// served a 0-byte body carrying the DASHBOARD RSC navigation's response
-// headers (`vary: rsc, next-router-state-tree, ...`, `x-nextjs-cache: HIT`,
-// even that request's `set-cookie`) instead of image bytes -- a server-side
-// cache-key collision between this static image route and an unrelated
-// cached RSC payload, confirmed via the failing CI run's network trace, not
-// guessed. `force-dynamic` (docs/app-icons.md: "cached by default unless
-// they use ... dynamic config") sidesteps that cache layer entirely rather
-// than working around a specific collision that could recur in a different
-// shape. Costs a fresh render per cache-miss request instead of a served
-// static file, which is fine here: public/sw.js's cache-first handling of
-// every `/icon/` path (lib/sw-strategy.ts) is the caching layer this app
-// actually depends on for repeat visits, not Next's server-side one.
-export const dynamic = "force-dynamic";
-
 // The app's generated icon routes. The artwork itself lives in
 // lib/icon-mark.tsx, shared with app/apple-icon.tsx -- see that module's
 // header for why the mark is drawn from divs instead of a text glyph.
