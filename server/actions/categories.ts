@@ -9,8 +9,9 @@ import {
   unarchiveCategory,
   type CategoryDTO,
 } from "@/server/data/categories";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/budgets.ts: extract FormData ->
@@ -39,6 +40,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
+  if (err instanceof RateLimitError) {
+    return errorResult(err.message);
+  }
   reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
@@ -55,6 +59,7 @@ export async function createCategoryAction(
   formData: FormData,
 ): Promise<ActionResult<CategoryDTO>> {
   try {
+    await enforceMutationRateLimit("createCategoryAction");
     const created = await createCategory({
       name: formData.get("name"),
       type: formData.get("type"),
@@ -73,6 +78,7 @@ export async function updateCategoryAction(
   formData: FormData,
 ): Promise<ActionResult<CategoryDTO>> {
   try {
+    await enforceMutationRateLimit("updateCategoryAction");
     const updated = await updateCategory(id, {
       name: formData.get("name") || undefined,
       color: formData.get("color") || undefined,
@@ -92,6 +98,7 @@ export async function archiveCategoryAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("archiveCategoryAction");
     await archiveCategory(id);
     revalidateCategoryPaths();
     return { ok: true, data: undefined };
@@ -106,6 +113,7 @@ export async function unarchiveCategoryAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("unarchiveCategoryAction");
     await unarchiveCategory(id);
     revalidateCategoryPaths();
     return { ok: true, data: undefined };

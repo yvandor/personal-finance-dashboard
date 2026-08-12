@@ -23,8 +23,17 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// The action itself now calls enforceMutationRateLimit() (server/rateLimit.ts)
+// before the DAL, which resolves the acting user via requireUserId() -- same
+// seam-mocking approach as tests/integration/transaction-actions.test.ts, so
+// this file's DAL-only mocking above doesn't leave that call unresolved.
+vi.mock("@/server/context", () => ({
+  requireUserId: vi.fn().mockResolvedValue("test-user"),
+}));
+
 const { createCategory } = await import("@/server/data/categories");
 const { createCategoryAction, archiveCategoryAction } = await import("@/server/actions/categories");
+const { __resetRateLimitsForTests } = await import("@/server/rateLimit");
 
 // Prisma-shaped: a real PrismaClientKnownRequestError's own `.message` can
 // quote the failing query and its bound parameters, and `meta` holds more
@@ -51,6 +60,7 @@ let logSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   vi.mocked(createCategory).mockReset();
+  __resetRateLimitsForTests();
 });
 
 afterEach(() => {

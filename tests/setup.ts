@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db";
+import { __resetRateLimitsForTests } from "@/server/rateLimit";
 import type { CategoryType } from "@/app/generated/prisma/enums";
 
 // Fixed ids for the two test identities. DEV_USER_ID matches whatever
@@ -14,6 +15,13 @@ export const OTHER_USER_ID = "other-test-user";
 // per-test given the tiny fixture size, and it keeps every test starting
 // from a known, empty state instead of depending on test execution order.
 export async function resetTestData(): Promise<void> {
+  // Server Actions share an in-memory rate-limit counter per userId (see
+  // server/rateLimit.ts) that persists across tests in the same process --
+  // without this, a test file that drives many actions through
+  // DEV_USER_ID/OTHER_USER_ID in sequence could trip the limiter and fail
+  // for a reason unrelated to what it's testing.
+  __resetRateLimitsForTests();
+
   const userIds = [DEV_USER_ID, OTHER_USER_ID];
   await prisma.transaction.deleteMany({ where: { userId: { in: userIds } } });
   // Explicit, not relied-upon-via-cascade: Budget.categoryId is

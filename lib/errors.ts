@@ -18,3 +18,15 @@ export class ValidationError extends Error {
     this.name = "ValidationError";
   }
 }
+
+// Thrown by server/rateLimit.ts when a user's mutation rate exceeds the
+// configured budget. A distinct type (not a ValidationError) because the
+// input itself isn't invalid -- the caller is, at this moment, sending too
+// many requests -- and Server Actions map it to its own client-facing
+// message rather than "please fix the highlighted fields."
+export class RateLimitError extends Error {
+  constructor(message = "Too many changes in a short time. Please wait a moment and try again.") {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}

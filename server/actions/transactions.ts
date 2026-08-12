@@ -9,8 +9,9 @@ import {
   type TransactionDTO,
 } from "@/server/data/transactions";
 import { parseMoneyToCents } from "@/lib/money";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design: extract FormData -> call the DAL (which re-validates with
@@ -39,6 +40,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
     return errorResult("That transaction, category, or income source couldn't be found.");
   }
   if (err instanceof ValidationError) {
+    return errorResult(err.message);
+  }
+  if (err instanceof RateLimitError) {
     return errorResult(err.message);
   }
   reportUnexpectedActionError(actionName, err);
@@ -104,6 +108,7 @@ export async function createTransactionAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("createTransactionAction");
     const created = await createTransaction(extracted.data);
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: created };
@@ -121,6 +126,7 @@ export async function updateTransactionAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("updateTransactionAction");
     const updated = await updateTransaction(id, extracted.data);
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: updated };
@@ -137,6 +143,7 @@ export async function deleteTransactionAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("deleteTransactionAction");
     await deleteTransaction(id);
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: undefined };
