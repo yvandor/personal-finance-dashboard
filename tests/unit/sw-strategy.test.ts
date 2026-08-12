@@ -12,12 +12,6 @@ describe("classifyRequest -- static (cache-first, versioned by build id)", () =>
     expect(classifyRequest("/manifest.webmanifest")).toBe("static");
   });
 
-  it("classifies icon routes as static, including a cache-busting query string", () => {
-    expect(classifyRequest("/icon")).toBe("static");
-    expect(classifyRequest("/icon?abc123")).toBe("static");
-    expect(classifyRequest("/icon/small")).toBe("static");
-  });
-
   it("classifies the apple-icon route as static, including a cache-busting query string", () => {
     expect(classifyRequest("/apple-icon")).toBe("static");
     expect(classifyRequest("/apple-icon?abc123")).toBe("static");
@@ -25,6 +19,18 @@ describe("classifyRequest -- static (cache-first, versioned by build id)", () =>
 
   it("classifies favicon.ico as static", () => {
     expect(classifyRequest("/favicon.ico")).toBe("static");
+  });
+
+  // app/icon-192/, app/icon-512/, and app/icon-maskable/route.tsx -- three
+  // independent routes, deliberately not ids of a shared
+  // generateImageMetadata array (see app/icon-192/route.tsx's header: that
+  // array shape let concurrent requests for two or more of its ids
+  // intermittently corrupt responses under Next.js 16.3.0/Turbopack). Exact
+  // match only -- none of these routes takes an id or sub-path.
+  it("classifies the icon-192, icon-512, and icon-maskable routes as static", () => {
+    expect(classifyRequest("/icon-192")).toBe("static");
+    expect(classifyRequest("/icon-512")).toBe("static");
+    expect(classifyRequest("/icon-maskable")).toBe("static");
   });
 
   it("works with absolute URLs, not just bare paths", () => {
@@ -63,10 +69,19 @@ describe("classifyRequest -- network-only (every navigation, no exceptions)", ()
     expect(classifyRequest("not a url")).toBe("network-only");
   });
 
-  it("does not treat a path merely starting with '/icon' or '/apple-icon' as a prefix match beyond the route boundary", () => {
-    // Guards against an overly loose `startsWith("/icon")` (no slash) that
-    // would also match an unrelated path like /icons/some-other-thing.
-    expect(classifyRequest("/icons/unrelated.png")).toBe("network-only");
+  it("does not treat a path merely starting with '/apple-icon' as a prefix match beyond the route boundary", () => {
     expect(classifyRequest("/apple-icons/unrelated.png")).toBe("network-only");
+  });
+
+  it("does not treat a path merely starting with '/icon-192', '/icon-512', or '/icon-maskable' as a prefix match", () => {
+    // Every icon route is an exact match now (see the "static" describe
+    // block above) -- none of them takes an id, sub-path, or query string,
+    // so none of them should match on prefix either.
+    expect(classifyRequest("/icon-1920")).toBe("network-only");
+    expect(classifyRequest("/icon-5120")).toBe("network-only");
+    expect(classifyRequest("/icon-maskable-fake")).toBe("network-only");
+    expect(classifyRequest("/icon-maskables")).toBe("network-only");
+    expect(classifyRequest("/icon")).toBe("network-only");
+    expect(classifyRequest("/icons/unrelated.png")).toBe("network-only");
   });
 });

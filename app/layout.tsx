@@ -18,8 +18,30 @@ export const metadata: Metadata = {
   description: "Personal finance dashboard — manual transaction tracking.",
   // No explicit `manifest:` field here -- Next's app/manifest.ts file
   // convention auto-injects the <link rel="manifest"> tag itself once that
-  // file exists, the same way app/icon.tsx/apple-icon.tsx auto-wire their
-  // own <link> tags with no metadata field needed for them either.
+  // file exists.
+  //
+  // `icons` is fully explicit here, INCLUDING `apple`, even though
+  // app/apple-icon.tsx is still a real file-convention route Next
+  // auto-generates a URL for. An explicit `metadata.icons` object replaces
+  // Next's file-convention icon auto-injection wholesale rather than merging
+  // with it -- found the hard way, via a real CI failure, when adding only
+  // `icon` here silently dropped the `<link rel="apple-touch-icon">` tag
+  // app/apple-icon.tsx used to get for free. `icon` itself is explicit
+  // because app/icon-192/route.tsx and app/icon-512/route.tsx are plain
+  // custom Route Handlers, not app/icon.tsx's former special-convention
+  // generateImageMetadata file (removed after a real, CI-reproduced Next.js
+  // 16.3.0/Turbopack bug -- see app/icon-192/route.tsx's header for the full
+  // writeup), so Next has no file to auto-discover an `<link rel="icon">`
+  // from either. Net effect: every icon link this app's <head> needs is
+  // listed here, once, rather than split between automatic and explicit
+  // wiring.
+  icons: {
+    icon: [
+      { url: "/icon-192", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  },
   // "default" (not "black-translucent"): the status bar overlaps the app's
   // own content only under black-translucent, which is exactly the case
   // app/globals.css's safe-area insets exist to handle correctly -- picking
