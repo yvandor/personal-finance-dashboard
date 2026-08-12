@@ -11,8 +11,9 @@ import {
   type SavingsGoalProgressDTO,
 } from "@/server/data/savingsGoals";
 import { parseMoneyToCents } from "@/lib/money";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/budgets.ts.
@@ -32,6 +33,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
     return errorResult("That savings goal couldn't be found.");
   }
   if (err instanceof ValidationError) {
+    return errorResult(err.message);
+  }
+  if (err instanceof RateLimitError) {
     return errorResult(err.message);
   }
   reportUnexpectedActionError(actionName, err);
@@ -64,6 +68,7 @@ export async function createSavingsGoalAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("createSavingsGoalAction");
     const created = await createSavingsGoal({
       name: formData.get("name"),
       description: formData.get("description") || undefined,
@@ -89,6 +94,7 @@ export async function updateSavingsGoalAction(
   const targetDateRaw = formData.get("targetDate");
 
   try {
+    await enforceMutationRateLimit("updateSavingsGoalAction");
     const updated = await updateSavingsGoal(id, {
       name: formData.get("name"),
       description: formData.get("description") || null,
@@ -111,6 +117,7 @@ export async function deleteSavingsGoalAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("deleteSavingsGoalAction");
     await deleteSavingsGoal(id);
     revalidatePath(GOALS_PATH);
     return { ok: true, data: undefined };
@@ -134,6 +141,7 @@ export async function contributeToGoalAction(
   const signedAmountCents = direction === "WITHDRAWAL" ? -extracted.amountCents : extracted.amountCents;
 
   try {
+    await enforceMutationRateLimit("contributeToGoalAction");
     const updated = await contributeToGoal(id, {
       amountCents: signedAmountCents,
       date: formData.get("date"),

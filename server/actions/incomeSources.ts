@@ -10,8 +10,9 @@ import {
   type IncomeSourceDTO,
 } from "@/server/data/incomeSources";
 import { parseMoneyToCents } from "@/lib/money";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/categories.ts: extract FormData
@@ -38,6 +39,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
     return errorResult("That income source couldn't be found.");
   }
   if (err instanceof ValidationError) {
+    return errorResult(err.message);
+  }
+  if (err instanceof RateLimitError) {
     return errorResult(err.message);
   }
   reportUnexpectedActionError(actionName, err);
@@ -87,6 +91,7 @@ export async function createIncomeSourceAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("createIncomeSourceAction");
     const created = await createIncomeSource({
       name: formData.get("name"),
       amountCents: extracted.amountCents,
@@ -109,6 +114,7 @@ export async function updateIncomeSourceAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("updateIncomeSourceAction");
     const updated = await updateIncomeSource(id, {
       name: formData.get("name") || undefined,
       amountCents: extracted.amountCents,
@@ -130,6 +136,7 @@ export async function archiveIncomeSourceAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("archiveIncomeSourceAction");
     await archiveIncomeSource(id);
     revalidateIncomeSourcePaths();
     return { ok: true, data: undefined };
@@ -144,6 +151,7 @@ export async function unarchiveIncomeSourceAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("unarchiveIncomeSourceAction");
     await unarchiveIncomeSource(id);
     revalidateIncomeSourcePaths();
     return { ok: true, data: undefined };

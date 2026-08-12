@@ -12,8 +12,9 @@ import {
   type MarkBillPaidResult,
 } from "@/server/data/recurringBills";
 import { parseMoneyToCents } from "@/lib/money";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/categories.ts: extract FormData
@@ -36,6 +37,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
     return errorResult("That bill couldn't be found.");
   }
   if (err instanceof ValidationError) {
+    return errorResult(err.message);
+  }
+  if (err instanceof RateLimitError) {
     return errorResult(err.message);
   }
   reportUnexpectedActionError(actionName, err);
@@ -82,6 +86,7 @@ export async function createRecurringBillAction(
   if (!due.ok) return due.result;
 
   try {
+    await enforceMutationRateLimit("createRecurringBillAction");
     const created = await createRecurringBill({
       name: formData.get("name"),
       amountCents: amount.amountCents,
@@ -107,6 +112,7 @@ export async function updateRecurringBillAction(
   if (!due.ok) return due.result;
 
   try {
+    await enforceMutationRateLimit("updateRecurringBillAction");
     const updated = await updateRecurringBill(id, {
       name: formData.get("name"),
       amountCents: amount.amountCents,
@@ -129,6 +135,7 @@ export async function archiveRecurringBillAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("archiveRecurringBillAction");
     await archiveRecurringBill(id);
     revalidateBillPaths();
     return { ok: true, data: undefined };
@@ -143,6 +150,7 @@ export async function unarchiveRecurringBillAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("unarchiveRecurringBillAction");
     await unarchiveRecurringBill(id);
     revalidateBillPaths();
     return { ok: true, data: undefined };
@@ -161,6 +169,7 @@ export async function markBillPaidAction(
   formData: FormData,
 ): Promise<ActionResult<MarkBillPaidResult>> {
   try {
+    await enforceMutationRateLimit("markBillPaidAction");
     const result = await markBillPaid(id, {
       periodMonth: formData.get("periodMonth"),
       logTransaction: formData.get("logTransaction") === "true",

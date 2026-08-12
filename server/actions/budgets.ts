@@ -11,8 +11,9 @@ import {
   type CopyBudgetsResult,
 } from "@/server/data/budgets";
 import { parseMoneyToCents } from "@/lib/money";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, RateLimitError } from "@/lib/errors";
 import { reportUnexpectedActionError } from "@/server/logger";
+import { enforceMutationRateLimit } from "@/server/rateLimit";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/transactions.ts: extract
@@ -40,6 +41,9 @@ function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
     return errorResult("That budget or category couldn't be found.");
   }
   if (err instanceof ValidationError) {
+    return errorResult(err.message);
+  }
+  if (err instanceof RateLimitError) {
     return errorResult(err.message);
   }
   reportUnexpectedActionError(actionName, err);
@@ -73,6 +77,7 @@ export async function createBudgetAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("createBudgetAction");
     const created = await createBudget({
       categoryId: formData.get("categoryId"),
       month: formData.get("month"),
@@ -95,6 +100,7 @@ export async function updateBudgetAction(
   if (!extracted.ok) return extracted.result;
 
   try {
+    await enforceMutationRateLimit("updateBudgetAction");
     const updated = await updateBudget(id, {
       amountCents: extracted.amountCents,
       notes: formData.get("notes") || undefined,
@@ -114,6 +120,7 @@ export async function deleteBudgetAction(
 ): Promise<ActionResult<void>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("deleteBudgetAction");
     await deleteBudget(id);
     revalidateBudgetPaths();
     return { ok: true, data: undefined };
@@ -130,6 +137,7 @@ export async function copyBudgetsFromMonthAction(
 ): Promise<ActionResult<CopyBudgetsResult>> {
   void prevState;
   try {
+    await enforceMutationRateLimit("copyBudgetsFromMonthAction");
     const result = await copyBudgetsFromMonth(input);
     revalidateBudgetPaths();
     return { ok: true, data: result };
