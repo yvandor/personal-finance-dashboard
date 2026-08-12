@@ -27,6 +27,16 @@ describe("classifyRequest -- static (cache-first, versioned by build id)", () =>
     expect(classifyRequest("/favicon.ico")).toBe("static");
   });
 
+  // app/icon-maskable/route.tsx -- a standalone route deliberately outside
+  // the /icon/ prefix above (see that route's header: it used to be a
+  // generateImageMetadata id of app/icon.tsx, moved out after concurrent
+  // requests for two ids of that same array intermittently corrupted
+  // responses under Next.js 16.3.0/Turbopack). Exact match only -- this
+  // route takes no id/query, unlike /icon/<id>.
+  it("classifies the icon-maskable route as static", () => {
+    expect(classifyRequest("/icon-maskable")).toBe("static");
+  });
+
   it("works with absolute URLs, not just bare paths", () => {
     expect(classifyRequest("https://example.com/_next/static/chunks/main-abc123.js")).toBe("static");
     expect(classifyRequest("https://example.com/manifest.webmanifest")).toBe("static");
@@ -68,5 +78,10 @@ describe("classifyRequest -- network-only (every navigation, no exceptions)", ()
     // would also match an unrelated path like /icons/some-other-thing.
     expect(classifyRequest("/icons/unrelated.png")).toBe("network-only");
     expect(classifyRequest("/apple-icons/unrelated.png")).toBe("network-only");
+  });
+
+  it("does not treat a path merely starting with '/icon-maskable' as a prefix match", () => {
+    expect(classifyRequest("/icon-maskable-fake")).toBe("network-only");
+    expect(classifyRequest("/icon-maskables")).toBe("network-only");
   });
 });

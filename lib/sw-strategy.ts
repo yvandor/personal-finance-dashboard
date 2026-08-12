@@ -56,6 +56,15 @@ export function classifyRequest(url: string): CacheStrategy {
   if (path === "/apple-icon" || path.startsWith("/apple-icon/")) return "static";
   if (path === "/favicon.ico") return "static";
 
+  // app/icon-maskable/route.tsx's emitted route -- a plain custom Route
+  // Handler, deliberately NOT under the /icon/ prefix above (see that
+  // route's own header for why: it used to be a generateImageMetadata id of
+  // app/icon.tsx, moved out to its own independent route after a real
+  // Next.js concurrency bug corrupted responses when two ids of that same
+  // array were requested at once). Still build-time-generated,
+  // non-financial image bytes -- exact match only, this route takes no id.
+  if (path === "/icon-maskable") return "static";
+
   return "network-only";
 }
 

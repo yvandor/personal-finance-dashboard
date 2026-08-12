@@ -70,7 +70,7 @@ that needs a real mobile device to be meaningful.
 - [ ] **Home-screen icon:** the installed icon is the bar mark, correctly
       centred, with **nothing clipped** — no bar touching or cut off by the
       edge of the icon's circle/squircle. On Android this is the maskable
-      icon (`/icon/512-maskable`); clipping here means the safe zone is
+      icon (`/icon-maskable`); clipping here means the safe zone is
       wrong.
 - [ ] **Launch:** opening from the home screen opens standalone — no browser
       address bar.

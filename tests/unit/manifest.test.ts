@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
 import { generateImageMetadata } from "@/app/icon";
+import { size as maskableSize } from "@/app/icon-maskable/route";
 
 // app/manifest.ts is a plain function returning a MetadataRoute.Manifest
 // object -- no request/route context involved -- so it's unit-testable
@@ -48,23 +49,40 @@ describe("manifest", () => {
   // perfectly and installs an app with a missing icon. Cross-checking the
   // two here catches it in the unit suite, with no server or browser --
   // e2e/pwa.spec.ts then confirms the routes actually serve the right bytes.
-  it("points every icon src at an id app/icon.tsx actually generates", () => {
+  //
+  // Scoped to `purpose !== "maskable"` on purpose: that entry is served by
+  // app/icon-maskable/route.tsx, a deliberately separate route rather than a
+  // third generateImageMetadata id (see that route's header for the real,
+  // CI-reproduced Next.js concurrency bug that moved it out) -- checked by
+  // its own dedicated test below instead.
+  it("points every unmasked icon src at an id app/icon.tsx actually generates", () => {
     const generated = generateImageMetadata();
     const routes = generated.map((image) => `/icon/${image.id}`);
 
     for (const icon of manifest().icons ?? []) {
+      if (icon.purpose === "maskable") continue;
       expect(routes, `${icon.src} should be a generated icon route`).toContain(icon.src);
     }
   });
 
-  it("declares the size app/icon.tsx renders for each icon src", () => {
+  it("declares the size app/icon.tsx renders for each unmasked icon src", () => {
     const byRoute = new Map(generateImageMetadata().map((image) => [`/icon/${image.id}`, image.size]));
 
     for (const icon of manifest().icons ?? []) {
+      if (icon.purpose === "maskable") continue;
       const size = byRoute.get(icon.src);
       expect(size, `${icon.src} should be generated`).toBeDefined();
       expect(icon.sizes).toBe(`${size!.width}x${size!.height}`);
     }
+  });
+
+  // The maskable entry's own version of the two checks above, against
+  // app/icon-maskable/route.tsx instead of app/icon.tsx's generated ids.
+  it("points the maskable icon at its own independent route with the right declared size", () => {
+    const maskable = (manifest().icons ?? []).find((icon) => icon.purpose === "maskable");
+    expect(maskable).toBeDefined();
+    expect(maskable!.src).toBe("/icon-maskable");
+    expect(maskable!.sizes).toBe(`${maskableSize.width}x${maskableSize.height}`);
   });
 
   // Regression guard for the v1.6 icon work: a maskable icon must be full

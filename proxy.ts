@@ -22,6 +22,7 @@ const PUBLIC_PATHS = [
   /^\/offline$/,
   /^\/manifest\.webmanifest$/,
   /^\/icon(\/|$)/,
+  /^\/icon-maskable$/,
   /^\/apple-icon$/,
   /^\/favicon\.ico$/,
   /^\/sw\.js$/,
