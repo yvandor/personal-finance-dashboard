@@ -18,8 +18,24 @@ export const metadata: Metadata = {
   description: "Personal finance dashboard — manual transaction tracking.",
   // No explicit `manifest:` field here -- Next's app/manifest.ts file
   // convention auto-injects the <link rel="manifest"> tag itself once that
-  // file exists, the same way app/icon.tsx/apple-icon.tsx auto-wire their
-  // own <link> tags with no metadata field needed for them either.
+  // file exists, the same way app/apple-icon.tsx auto-wires its own <link>
+  // tag with no metadata field needed for it either.
+  //
+  // `icons` IS explicit here, unlike apple-icon -- app/icon-192/route.tsx
+  // and app/icon-512/route.tsx are plain custom Route Handlers, not
+  // app/icon.tsx's special-convention generateImageMetadata file, so Next
+  // has no file to auto-discover and inject a <link rel="icon"> tag from.
+  // They're two independent routes instead of ids of one shared array
+  // specifically because that array was a real, CI-reproduced Next.js
+  // 16.3.0/Turbopack bug -- see app/icon-192/route.tsx's header for the
+  // full writeup. This is the deliberate cost of that fix: one explicit
+  // list here instead of automatic wiring.
+  icons: {
+    icon: [
+      { url: "/icon-192", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512", sizes: "512x512", type: "image/png" },
+    ],
+  },
   // "default" (not "black-translucent"): the status bar overlaps the app's
   // own content only under black-translucent, which is exactly the case
   // app/globals.css's safe-area insets exist to handle correctly -- picking

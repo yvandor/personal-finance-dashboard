@@ -112,11 +112,13 @@ function classifyRequest(url) {
 
   if (path.startsWith("/_next/static/")) return "static";
   if (path === "/manifest.webmanifest") return "static";
-  if (path === "/icon" || path.startsWith("/icon/")) return "static";
   if (path === "/apple-icon" || path.startsWith("/apple-icon/")) return "static";
   if (path === "/favicon.ico") return "static";
-  // app/icon-maskable/route.tsx's route -- see lib/sw-strategy.ts's copy of
-  // this same line for why it's outside the /icon/ prefix above.
+  // app/icon-192/, app/icon-512/, and app/icon-maskable/route.tsx's routes
+  // -- see lib/sw-strategy.ts's copy of these same lines for why they're
+  // three independent exact-match routes rather than one shared prefix.
+  if (path === "/icon-192") return "static";
+  if (path === "/icon-512") return "static";
   if (path === "/icon-maskable") return "static";
   return "network-only";
 }

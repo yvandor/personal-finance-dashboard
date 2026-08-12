@@ -1,13 +1,13 @@
-// The one drawing of this app's icon, shared by every generated icon route
-// (app/icon.tsx's /icon/192 and /icon/512, app/icon-maskable/route.tsx's
-// /icon-maskable, and app/apple-icon.tsx's /apple-icon -- four separate
-// route files, not variants of one; see app/icon-maskable/route.tsx's
-// header for why maskable specifically isn't a generateImageMetadata id of
-// app/icon.tsx). Kept in one module rather than copied per route file so
-// the four rendered variants cannot drift into being four slightly
-// different logos -- the only things that legitimately differ between them
-// are the canvas size and how much safe-zone padding the destination
-// platform demands, both of which are parameters below.
+// The one drawing of this app's icon, shared by every generated icon route:
+// app/icon-192/, app/icon-512/, app/icon-maskable/, and app/apple-icon.tsx's
+// /apple-icon -- four independent Route Handlers, deliberately not variants
+// of one generateImageMetadata array (see app/icon-192/route.tsx's header
+// for the real, CI-reproduced Next.js concurrency bug that shape caused).
+// Kept in one module rather than copied per route file so the four
+// rendered variants cannot drift into being four slightly different logos
+// -- the only things that legitimately differ between them are the canvas
+// size and how much safe-zone padding the destination platform demands,
+// both of which are parameters below.
 //
 // Drawn entirely from <div>s, never from a text glyph. ImageResponse
 // renders through Satori, which embeds a single default font at a single

@@ -51,8 +51,10 @@ test.describe("PWA manifest", () => {
 
   // The manifest declares each icon's src, type and pixel dimensions, and
   // nothing in the build checks that any of those claims are true -- the
-  // srcs are hand-written strings pointing at app/icon.tsx's
-  // generateImageMetadata ids. A typo'd or removed id would leave a
+  // srcs are hand-written strings pointing at app/icon-192/, app/icon-512/,
+  // and app/icon-maskable/route.tsx (three independent routes; see
+  // app/icon-192/route.tsx's header for why they aren't generateImageMetadata
+  // ids sharing one array). A typo'd or renamed route would leave a
   // manifest that parses fine and installs an app with a broken icon, which
   // is exactly the kind of failure nobody notices until it is on someone's
   // home screen. So: follow every src and check the real bytes.

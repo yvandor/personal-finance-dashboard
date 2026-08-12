@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
-import { generateImageMetadata } from "@/app/icon";
+import { size as icon192Size } from "@/app/icon-192/route";
+import { size as icon512Size } from "@/app/icon-512/route";
 import { size as maskableSize } from "@/app/icon-maskable/route";
 
 // app/manifest.ts is a plain function returning a MetadataRoute.Manifest
@@ -43,42 +44,39 @@ describe("manifest", () => {
     }
   });
 
-  // The manifest's icon srcs are hand-written strings that have to line up
-  // with app/icon.tsx's generateImageMetadata ids; nothing in the build
-  // checks that, so a renamed or dropped id leaves a manifest that parses
-  // perfectly and installs an app with a missing icon. Cross-checking the
-  // two here catches it in the unit suite, with no server or browser --
-  // e2e/pwa.spec.ts then confirms the routes actually serve the right bytes.
+  // The manifest's icon srcs and sizes are hand-written strings/literals
+  // that have to line up with what each icon route actually serves;
+  // nothing in the build checks that, so a renamed route or a changed
+  // export const size leaves a manifest that parses perfectly and installs
+  // an app with a missing or mis-declared icon. Cross-checking against each
+  // route's own exported `size` here catches it in the unit suite, with no
+  // server or browser -- e2e/pwa.spec.ts then confirms the routes actually
+  // serve the right bytes.
   //
-  // Scoped to `purpose !== "maskable"` on purpose: that entry is served by
-  // app/icon-maskable/route.tsx, a deliberately separate route rather than a
-  // third generateImageMetadata id (see that route's header for the real,
-  // CI-reproduced Next.js concurrency bug that moved it out) -- checked by
-  // its own dedicated test below instead.
-  it("points every unmasked icon src at an id app/icon.tsx actually generates", () => {
-    const generated = generateImageMetadata();
-    const routes = generated.map((image) => `/icon/${image.id}`);
-
-    for (const icon of manifest().icons ?? []) {
-      if (icon.purpose === "maskable") continue;
-      expect(routes, `${icon.src} should be a generated icon route`).toContain(icon.src);
-    }
+  // Three separate routes, not one generateImageMetadata array with three
+  // ids: that array shape was a real, CI-reproduced Next.js 16.3.0/
+  // Turbopack bug (concurrent requests for two or more of its ids
+  // intermittently came back with a PNG of the correct declared byte length
+  // but corrupted, undecodable content) -- see app/icon-192/route.tsx's
+  // header for the full writeup. Don't collapse these back into a shared
+  // array or a loop over a lookup table; three explicit checks against
+  // three explicit imports is what keeps that mistake from being trivial to
+  // reintroduce.
+  it("points the 192 icon at its own route with the right declared size", () => {
+    const icon = (manifest().icons ?? []).find((i) => i.sizes === "192x192" && i.purpose !== "maskable");
+    expect(icon).toBeDefined();
+    expect(icon!.src).toBe("/icon-192");
+    expect(icon!.sizes).toBe(`${icon192Size.width}x${icon192Size.height}`);
   });
 
-  it("declares the size app/icon.tsx renders for each unmasked icon src", () => {
-    const byRoute = new Map(generateImageMetadata().map((image) => [`/icon/${image.id}`, image.size]));
-
-    for (const icon of manifest().icons ?? []) {
-      if (icon.purpose === "maskable") continue;
-      const size = byRoute.get(icon.src);
-      expect(size, `${icon.src} should be generated`).toBeDefined();
-      expect(icon.sizes).toBe(`${size!.width}x${size!.height}`);
-    }
+  it("points the 512 icon at its own route with the right declared size", () => {
+    const icon = (manifest().icons ?? []).find((i) => i.sizes === "512x512" && i.purpose !== "maskable");
+    expect(icon).toBeDefined();
+    expect(icon!.src).toBe("/icon-512");
+    expect(icon!.sizes).toBe(`${icon512Size.width}x${icon512Size.height}`);
   });
 
-  // The maskable entry's own version of the two checks above, against
-  // app/icon-maskable/route.tsx instead of app/icon.tsx's generated ids.
-  it("points the maskable icon at its own independent route with the right declared size", () => {
+  it("points the maskable icon at its own route with the right declared size", () => {
     const maskable = (manifest().icons ?? []).find((icon) => icon.purpose === "maskable");
     expect(maskable).toBeDefined();
     expect(maskable!.src).toBe("/icon-maskable");

@@ -41,9 +41,14 @@ test.describe("Generated icons under a production build", () => {
   // e2e/pwa.spec.ts already follows every manifest icon src against the dev
   // server. This covers the two things only a real build can show:
   //
-  // 1. app/icon.tsx's generateImageMetadata ids are emitted as routes by
-  //    `next build`, not merely resolved on demand by `next dev`. A bad or
-  //    renamed id is a 404 that dev mode can hide.
+  // 1. Each icon Route Handler is emitted as a real route by `next build`,
+  //    not merely resolved on demand by `next dev`. A bad or renamed route
+  //    is a 404 that dev mode can hide. This is also the specific test that
+  //    caught a real, CI-only Next.js 16.3.0/Turbopack bug during v1.6:
+  //    concurrent requests to two or more ids sharing a generateImageMetadata
+  //    array intermittently returned a correctly-sized but corrupted,
+  //    undecodable PNG -- see app/icon-192/route.tsx's header for the full
+  //    writeup and why every icon is now its own independent route.
   // 2. The icons still resolve once the service worker is active. Icon paths
   //    are the one place lib/sw-strategy.ts hands back "static" (cache-first)
   //    instead of the network-only default, so these requests go down a code

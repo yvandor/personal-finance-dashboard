@@ -47,22 +47,25 @@ export function classifyRequest(url: string): CacheStrategy {
   // app/manifest.ts's emitted route.
   if (path === "/manifest.webmanifest") return "static";
 
-  // app/icon.tsx / app/apple-icon.tsx's emitted routes. Matched by prefix
-  // (not exact-equals) because Next's file-convention icon routes can carry
-  // a cache-busting query string and, when a route uses
-  // generateImageMetadata for multiple sizes, an /icon/<id>-shaped path --
-  // both still point at build-time-generated, non-financial image bytes.
-  if (path === "/icon" || path.startsWith("/icon/")) return "static";
+  // app/apple-icon.tsx's emitted route. Matched by prefix (not exact-equals)
+  // because Next's file-convention icon routes can carry a cache-busting
+  // query string.
   if (path === "/apple-icon" || path.startsWith("/apple-icon/")) return "static";
   if (path === "/favicon.ico") return "static";
 
-  // app/icon-maskable/route.tsx's emitted route -- a plain custom Route
-  // Handler, deliberately NOT under the /icon/ prefix above (see that
-  // route's own header for why: it used to be a generateImageMetadata id of
-  // app/icon.tsx, moved out to its own independent route after a real
-  // Next.js concurrency bug corrupted responses when two ids of that same
-  // array were requested at once). Still build-time-generated,
-  // non-financial image bytes -- exact match only, this route takes no id.
+  // app/icon-192/route.tsx, app/icon-512/route.tsx, and
+  // app/icon-maskable/route.tsx's emitted routes -- three independent
+  // Route Handlers, deliberately NOT ids of one shared generateImageMetadata
+  // array the way this app's icons briefly were: concurrent requests for
+  // two or more ids of that same array intermittently came back with a PNG
+  // of the correct declared byte length but corrupted, undecodable content,
+  // a real Next.js 16.3.0/Turbopack bug root-caused against a real
+  // production build (see app/icon-192/route.tsx's header for the full
+  // writeup). Each is matched exactly, not by prefix -- none of these
+  // routes takes an id or sub-path. Still build-time-generated,
+  // non-financial image bytes either way.
+  if (path === "/icon-192") return "static";
+  if (path === "/icon-512") return "static";
   if (path === "/icon-maskable") return "static";
 
   return "network-only";
