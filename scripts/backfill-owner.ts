@@ -148,27 +148,27 @@ type PrismaLike = any;
 // All eight reassignments run inside one interactive transaction: either
 // every table's rows move to the new owner, or none of them do.
 //
-// `transactions_category_same_owner` and `budgets_category_same_owner`
-// (see prisma/schema.prisma's comment on them) are composite foreign keys
-// -- (categoryId, userId) must match an existing (id, userId) pair in
-// categories. Reassigning EITHER side alone (category first, or
-// transaction/budget first) leaves that pair momentarily inconsistent, and
-// no ordering avoids it -- the two rows can only become consistent again
-// once BOTH updates have run. Found by rehearsing this script against a
-// real database (not assumed), which is why the two constraints are
-// DEFERRABLE INITIALLY IMMEDIATE as of prisma/migrations/
-// 20260811075601_defer_same_owner_fks -- normal application traffic still
-// gets the original immediate check (zero behavior change there), but this
-// script can explicitly defer both to end-of-transaction via `SET
-// CONSTRAINTS ... DEFERRED`, making the eight updates' relative order
-// genuinely not matter. The remaining tables (savingsGoal,
-// savingsContribution, incomeSource, recurringBill, recurringBillPayment)
-// have no composite same-owner FK at all -- see this script's accompanying
-// report for the audit finding that those relations rely on
-// application-level checks only.
+// Every constraint deferred below is a composite same-owner foreign key
+// (see prisma/schema.prisma) -- the child's (someId, userId) pair must
+// match an existing (id, userId) pair on the parent. Reassigning EITHER
+// side alone leaves that pair momentarily inconsistent, and no ordering
+// avoids it: the two rows can only become consistent again once BOTH
+// updates have run. Found by rehearsing this script against a real
+// database (not assumed), which is why every one of them is DEFERRABLE
+// INITIALLY IMMEDIATE -- normal application traffic still gets the
+// original immediate check (zero behavior change there), but this script
+// can explicitly defer them all to end-of-transaction, making the eight
+// updates' relative order genuinely not matter.
+//
+// The first two date from 20260811075601_defer_same_owner_fks; the other
+// five were added by 20260811120000_v1_6_same_owner_fks, which closed the
+// gap where savings, income, and recurring-bill relations had no
+// database-level same-owner check at all and leaned on application-level
+// ownership checks alone. Anything added to that migration must be listed
+// here too, or a future run fails partway through.
 async function runReassignment(prisma: PrismaLike, devUserId: string, targetUserId: string): Promise<void> {
   await prisma.$transaction(async (tx: PrismaLike) => {
-    await tx.$executeRaw`SET CONSTRAINTS "transactions_category_same_owner", "budgets_category_same_owner" DEFERRED`;
+    await tx.$executeRaw`SET CONSTRAINTS "transactions_category_same_owner", "budgets_category_same_owner", "transactions_income_source_same_owner", "savings_contributions_goal_same_owner", "recurring_bill_payments_bill_same_owner", "recurring_bills_category_same_owner", "recurring_bill_payments_transaction_same_owner" DEFERRED`;
     await tx.category.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
     await tx.transaction.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });
     await tx.budget.updateMany({ where: { userId: devUserId }, data: { userId: targetUserId } });

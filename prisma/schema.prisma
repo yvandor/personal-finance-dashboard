@@ -170,6 +170,7 @@ model Transaction {
   incomeSource IncomeSource?         @relation(fields: [incomeSourceId], references: [id], onDelete: SetNull)
   billPayment  RecurringBillPayment?
 
+  @@unique([id, userId]) // target of recurring_bill_payments_transaction_same_owner
   @@index([userId, date(sort: Desc), id]) // primary list ordering + keyset pagination
   @@index([userId, categoryId, date]) // category filter + per-category rollups
   @@index([userId, type, date]) // income/expense split for monthly summaries
@@ -215,6 +216,7 @@ model SavingsGoal {
   contributions SavingsContribution[]
 
   @@unique([userId, name])
+  @@unique([id, userId]) // target of savings_contributions_goal_same_owner
   @@index([userId, status, targetDate])
   @@map("savings_goals")
 }
@@ -261,6 +263,7 @@ model IncomeSource {
   transactions Transaction[]
 
   @@unique([userId, name])
+  @@unique([id, userId]) // target of transactions_income_source_same_owner
   @@index([userId, isActive])
   @@map("income_sources")
 }
@@ -287,6 +290,7 @@ model RecurringBill {
   payments RecurringBillPayment[]
 
   @@unique([userId, name])
+  @@unique([id, userId]) // target of recurring_bill_payments_bill_same_owner
   @@index([userId, isActive, dueDay])
   @@map("recurring_bills")
 }
