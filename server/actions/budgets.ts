@@ -12,6 +12,7 @@ import {
 } from "@/server/data/budgets";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { reportUnexpectedActionError } from "@/server/logger";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/transactions.ts: extract
@@ -30,7 +31,7 @@ function errorResult(message: string, fieldErrors?: Record<string, string[]>): A
 // messages from error types thrown ourselves for expected, input-shaped
 // problems, never a raw caught error's message (could name columns or leak
 // internals).
-function toErrorResult(err: unknown): ActionResult<never> {
+function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof z.ZodError) {
     const fieldErrors = err.flatten().fieldErrors as Record<string, string[]>;
     return errorResult("Please fix the highlighted fields.", fieldErrors);
@@ -41,7 +42,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
-  console.error("Unexpected error in a budget action:", err);
+  reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
 
@@ -81,7 +82,7 @@ export async function createBudgetAction(
     revalidateBudgetPaths();
     return { ok: true, data: created };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "createBudgetAction");
   }
 }
 
@@ -101,7 +102,7 @@ export async function updateBudgetAction(
     revalidateBudgetPaths();
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "updateBudgetAction");
   }
 }
 
@@ -117,7 +118,7 @@ export async function deleteBudgetAction(
     revalidateBudgetPaths();
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "deleteBudgetAction");
   }
 }
 
@@ -133,6 +134,6 @@ export async function copyBudgetsFromMonthAction(
     revalidateBudgetPaths();
     return { ok: true, data: result };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "copyBudgetsFromMonthAction");
   }
 }

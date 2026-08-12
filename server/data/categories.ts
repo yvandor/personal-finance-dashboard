@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import { categoryCreateSchema, categoryUpdateSchema } from "@/lib/schemas/category";
 import type { Category } from "@/app/generated/prisma/client";
 import type { CategoryType } from "@/app/generated/prisma/enums";
@@ -105,7 +106,7 @@ export async function updateCategory(id: string, input: unknown): Promise<Catego
       },
     });
     if (result.count === 0) {
-      throw new NotFoundError("Category not found");
+      throw authzDenied("category", id);
     }
   } catch (err) {
     if (err instanceof NotFoundError) throw err;
@@ -114,7 +115,7 @@ export async function updateCategory(id: string, input: unknown): Promise<Catego
 
   const updated = await prisma.category.findFirst({ where: { id, userId } });
   if (!updated) {
-    throw new NotFoundError("Category not found");
+    throw authzDenied("category", id);
   }
   return toDTO(updated);
 }
@@ -123,7 +124,7 @@ async function setArchived(id: string, isArchived: boolean): Promise<void> {
   const userId = await requireUserId();
   const result = await prisma.category.updateMany({ where: { id, userId }, data: { isArchived } });
   if (result.count === 0) {
-    throw new NotFoundError("Category not found");
+    throw authzDenied("category", id);
   }
 }
 

@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/server/db";
 import { serverEnv } from "@/server/env";
 import { isAllowedSigninEmail } from "@/lib/auth";
+import { hashEmail, logAuthSigninBlocked, logAuthSigninSuccess } from "@/server/logger";
 
 // The single Auth.js config for this app -- used directly by proxy.ts as
 // well as everywhere else (Server Components, Server Actions, the route
@@ -44,8 +45,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/sign-in",
   },
   callbacks: {
-    async signIn({ user }) {
-      return isAllowedSigninEmail(user.email, serverEnv.ALLOWED_SIGNIN_EMAILS);
+    // The allowlist decision is logged either way, because both outcomes
+    // are security-relevant and each is only interpretable against the
+    // other: a blocked attempt matters most when it is NOT surrounded by
+    // the owner's own successful sign-ins. Neither line carries the email
+    // itself -- see server/logger.ts on why blocked attempts log a
+    // truncated digest and successful ones log the opaque user id instead.
+    async signIn({ user, account }) {
+      // `account` is non-null for the OAuth flow this app actually uses;
+      // next-auth types it nullable to cover Credentials/Email providers,
+      // which are deliberately not configured here.
+      const provider = account?.provider ?? "unknown";
+
+      if (!isAllowedSigninEmail(user.email, serverEnv.ALLOWED_SIGNIN_EMAILS)) {
+        // A missing email is itself a rejection (isAllowedSigninEmail fails
+        // closed on it), so there is nothing to hash -- the sentinel keeps
+        // the field's shape uniform without inventing a digest.
+        logAuthSigninBlocked({ emailHash: user.email ? hashEmail(user.email) : "no-email", provider });
+        return false;
+      }
+
+      logAuthSigninSuccess({ userId: user.id ?? "pending-adapter-create", provider });
+      return true;
     },
     // Database-session mode calls this with `{ session, user }` (the
     // adapter-loaded row), not `{ session, token }` (JWT mode) -- explicit

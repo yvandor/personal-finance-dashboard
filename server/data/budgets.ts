@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import { budgetCreateSchema, budgetUpdateSchema, budgetFilterSchema, copyBudgetsSchema } from "@/lib/schemas/budget";
 import { monthKeyRange, currentMonthKey } from "@/lib/dates";
 import { computeBudgetProgress } from "@/lib/budgets";
@@ -53,7 +54,7 @@ function monthOf(periodStart: Date): string {
 async function assertBudgetableCategory(categoryId: string, userId: string): Promise<{ name: string }> {
   const category = await prisma.category.findFirst({ where: { id: categoryId, userId } });
   if (!category) {
-    throw new NotFoundError("Category not found");
+    throw authzDenied("category", categoryId);
   }
   if (category.type !== "EXPENSE") {
     throw new ValidationError(
@@ -179,7 +180,7 @@ export async function updateBudget(id: string, input: unknown): Promise<BudgetDT
     },
   });
   if (result.count === 0) {
-    throw new NotFoundError("Budget not found");
+    throw authzDenied("budget", id);
   }
 
   const updated = await prisma.budget.findFirst({
@@ -187,7 +188,7 @@ export async function updateBudget(id: string, input: unknown): Promise<BudgetDT
     include: { category: { select: { name: true } } },
   });
   if (!updated) {
-    throw new NotFoundError("Budget not found");
+    throw authzDenied("budget", id);
   }
   return {
     id: updated.id,
@@ -203,7 +204,7 @@ export async function deleteBudget(id: string): Promise<void> {
   const userId = await requireUserId();
   const result = await prisma.budget.deleteMany({ where: { id, userId } });
   if (result.count === 0) {
-    throw new NotFoundError("Budget not found");
+    throw authzDenied("budget", id);
   }
 }
 

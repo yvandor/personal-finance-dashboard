@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/server/db";
 import { requireUserId } from "@/server/context";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { ValidationError } from "@/lib/errors";
+import { authzDenied } from "@/server/logger";
 import {
   transactionCreateSchema,
   transactionUpdateSchema,
@@ -77,7 +78,7 @@ async function assertUsableCategory(
     where: { id: categoryId, userId },
   });
   if (!category) {
-    throw new NotFoundError("Category not found");
+    throw authzDenied("category", categoryId);
   }
   if (category.type !== expectedType) {
     throw new ValidationError(
@@ -100,7 +101,7 @@ async function assertUsableIncomeSource(
     where: { id: incomeSourceId, userId },
   });
   if (!source) {
-    throw new NotFoundError("Income source not found");
+    throw authzDenied("incomeSource", incomeSourceId);
   }
   if (transactionType !== "INCOME") {
     throw new ValidationError("An income source can only be linked to an income transaction");
@@ -297,7 +298,7 @@ export async function updateTransaction(id: string, input: unknown): Promise<Tra
 
   const existing = await prisma.transaction.findFirst({ where: { id, userId } });
   if (!existing) {
-    throw new NotFoundError("Transaction not found");
+    throw authzDenied("transaction", id);
   }
 
   if (data.categoryId) {
@@ -321,12 +322,12 @@ export async function updateTransaction(id: string, input: unknown): Promise<Tra
   });
 
   if (result.count === 0) {
-    throw new NotFoundError("Transaction not found");
+    throw authzDenied("transaction", id);
   }
 
   const updated = await prisma.transaction.findFirst({ where: { id, userId } });
   if (!updated) {
-    throw new NotFoundError("Transaction not found");
+    throw authzDenied("transaction", id);
   }
   return toDTO(updated);
 }
@@ -335,6 +336,6 @@ export async function deleteTransaction(id: string): Promise<void> {
   const userId = await requireUserId();
   const result = await prisma.transaction.deleteMany({ where: { id, userId } });
   if (result.count === 0) {
-    throw new NotFoundError("Transaction not found");
+    throw authzDenied("transaction", id);
   }
 }

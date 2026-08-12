@@ -11,6 +11,7 @@ import {
 } from "@/server/data/incomeSources";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { reportUnexpectedActionError } from "@/server/logger";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design, mirroring server/actions/categories.ts: extract FormData
@@ -28,7 +29,7 @@ function errorResult(message: string, fieldErrors?: Record<string, string[]>): A
   return { ok: false, error: message, fieldErrors };
 }
 
-function toErrorResult(err: unknown): ActionResult<never> {
+function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof z.ZodError) {
     const fieldErrors = err.flatten().fieldErrors as Record<string, string[]>;
     return errorResult("Please fix the highlighted fields.", fieldErrors);
@@ -39,7 +40,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
-  console.error("Unexpected error in an income source action:", err);
+  reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
 
@@ -95,7 +96,7 @@ export async function createIncomeSourceAction(
     revalidateIncomeSourcePaths();
     return { ok: true, data: created };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "createIncomeSourceAction");
   }
 }
 
@@ -117,7 +118,7 @@ export async function updateIncomeSourceAction(
     revalidateIncomeSourcePaths();
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "updateIncomeSourceAction");
   }
 }
 
@@ -133,7 +134,7 @@ export async function archiveIncomeSourceAction(
     revalidateIncomeSourcePaths();
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "archiveIncomeSourceAction");
   }
 }
 
@@ -147,6 +148,6 @@ export async function unarchiveIncomeSourceAction(
     revalidateIncomeSourcePaths();
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "unarchiveIncomeSourceAction");
   }
 }

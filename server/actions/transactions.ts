@@ -10,6 +10,7 @@ import {
 } from "@/server/data/transactions";
 import { parseMoneyToCents } from "@/lib/money";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import { reportUnexpectedActionError } from "@/server/logger";
 import type { ActionResult } from "@/lib/result";
 
 // Thin by design: extract FormData -> call the DAL (which re-validates with
@@ -29,7 +30,7 @@ function errorResult(message: string, fieldErrors?: Record<string, string[]>): A
 // (NotFoundError, ValidationError, ZodError) -- never a raw caught error's
 // message, which could be a Prisma/driver error naming columns or leaking
 // internals.
-function toErrorResult(err: unknown): ActionResult<never> {
+function toErrorResult(err: unknown, actionName: string): ActionResult<never> {
   if (err instanceof z.ZodError) {
     const fieldErrors = err.flatten().fieldErrors as Record<string, string[]>;
     return errorResult("Please fix the highlighted fields.", fieldErrors);
@@ -40,7 +41,7 @@ function toErrorResult(err: unknown): ActionResult<never> {
   if (err instanceof ValidationError) {
     return errorResult(err.message);
   }
-  console.error("Unexpected error in a transaction action:", err);
+  reportUnexpectedActionError(actionName, err);
   return errorResult("Something went wrong. Please try again.");
 }
 
@@ -107,7 +108,7 @@ export async function createTransactionAction(
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: created };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "createTransactionAction");
   }
 }
 
@@ -124,7 +125,7 @@ export async function updateTransactionAction(
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: updated };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "updateTransactionAction");
   }
 }
 
@@ -140,6 +141,6 @@ export async function deleteTransactionAction(
     revalidatePath(TRANSACTIONS_PATH);
     return { ok: true, data: undefined };
   } catch (err) {
-    return toErrorResult(err);
+    return toErrorResult(err, "deleteTransactionAction");
   }
 }
