@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NAV_ITEMS } from "@/lib/navigation";
+import { NAV_ITEMS, useActiveNavHref, type NavItem } from "@/lib/navigation";
 
 // Built on the native <dialog> element, same reasoning as components/ui/Modal.tsx:
 // showModal() gives focus trapping and top-layer stacking for free, and
@@ -27,10 +27,32 @@ interface MobileNavProps {
   // "Server Components as props to Client Components" pattern (Next.js
   // docs, server-and-client-components#interleaving-server-and-client-components).
   signOutSlot?: ReactNode;
+  /**
+   * Controlled open state, paired with onOpenChange. When both are
+   * supplied, the caller (components/layout/BottomNav.tsx, whose "More"
+   * item opens this same drawer) owns whether the drawer is open, and
+   * hideTrigger should also be passed so the drawer isn't reachable from
+   * two different controls. When onOpenChange is omitted, MobileNav falls
+   * back to managing its own open state via the internal hamburger button
+   * below -- the original, fully self-contained behavior exercised by
+   * tests/unit/components/MobileNav.test.tsx.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /**
+   * Suppresses the internal hamburger trigger button. Used when a
+   * different control (BottomNav's "More" item) already owns opening the
+   * drawer, so the page never shows two different controls that open the
+   * identical drawer.
+   */
+  hideTrigger?: boolean;
 }
 
-export function MobileNav({ signOutSlot }: MobileNavProps) {
-  const [open, setOpen] = useState(false);
+export function MobileNav({ signOutSlot, open: openProp, onOpenChange, hideTrigger = false }: MobileNavProps) {
+  const isControlled = onOpenChange !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? (openProp ?? false) : internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -58,16 +80,18 @@ export function MobileNav({ signOutSlot }: MobileNavProps) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open navigation menu"
-        className="rounded-md p-2 text-muted hover:bg-surface-hover hover:text-foreground"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
-        </svg>
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open navigation menu"
+          className="rounded-md p-2 text-muted hover:bg-surface-hover hover:text-foreground"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
 
       <dialog
         ref={dialogRef}
@@ -103,24 +127,35 @@ export function MobileNav({ signOutSlot }: MobileNavProps) {
           </button>
         </div>
         <nav className="flex flex-col gap-1 p-3">
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                  active ? "bg-surface-hover text-foreground" : "text-muted hover:bg-surface-hover hover:text-foreground"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <DrawerNavLink key={item.href} item={item} />
+          ))}
         </nav>
         {signOutSlot && <div className="mt-auto border-t border-border p-3">{signOutSlot}</div>}
       </dialog>
     </>
+  );
+}
+
+function DrawerNavLink({ item }: { item: NavItem }) {
+  const active = useActiveNavHref(item.href);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      // Same --accent-subtle + text-accent + font-weight pairing as
+      // SidebarNav in lib/navigation.tsx -- see app/globals.css's ACCENT
+      // convention for why the background alone is never a sufficient
+      // active-state signal.
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+        active
+          ? "bg-accent-subtle font-medium text-accent"
+          : "font-medium text-muted hover:bg-surface-hover hover:text-foreground"
+      }`}
+    >
+      <Icon className="size-5 shrink-0" />
+      {item.label}
+    </Link>
   );
 }
