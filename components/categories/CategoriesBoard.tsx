@@ -11,7 +11,7 @@ interface CategoriesBoardProps {
 }
 
 const PRIMARY_BUTTON_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 // Owns the useOptimistic overlay so the header's "Add category" trigger and
 // the list below it share one optimistic array -- same shape as
@@ -23,7 +23,7 @@ export function CategoriesBoard({ categories }: CategoriesBoardProps) {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Categories</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
           <p className="text-sm text-muted">
             Organize income and expenses. Archiving hides a category from new entries without touching its history.
           </p>

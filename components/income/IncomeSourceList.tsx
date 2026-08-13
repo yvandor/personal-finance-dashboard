@@ -21,7 +21,7 @@ function Section({
   if (items.length === 0) return null;
   return (
     <div>
-      <h2 className="mb-2 text-sm font-semibold text-muted">{title}</h2>
+      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
       <div className="space-y-2">
         {items.map((s) => (
           <IncomeSourceRow key={s.id} incomeSource={s} currency={currency} onOptimisticUpdate={onOptimisticUpdate} />
