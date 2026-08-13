@@ -189,7 +189,7 @@ export function TransactionForm({
           required
           aria-invalid={fieldErrors?.amount ? true : undefined}
           aria-describedby={fieldErrors?.amount ? fieldId("amount-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.amount && (
           <p id={fieldId("amount-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -211,7 +211,7 @@ export function TransactionForm({
           required
           aria-invalid={fieldErrors?.date ? true : undefined}
           aria-describedby={fieldErrors?.date ? fieldId("date-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.date && (
           <p id={fieldId("date-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -233,7 +233,7 @@ export function TransactionForm({
           required
           aria-invalid={fieldErrors?.categoryId ? true : undefined}
           aria-describedby={fieldErrors?.categoryId ? fieldId("category-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         >
           <option value="" disabled>
             Select a category
@@ -267,7 +267,7 @@ export function TransactionForm({
             onChange={(e) => setIncomeSourceId(e.target.value)}
             aria-invalid={fieldErrors?.incomeSourceId ? true : undefined}
             aria-describedby={fieldErrors?.incomeSourceId ? fieldId("incomeSourceId-error") : undefined}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+            className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
           >
             <option value="">No source</option>
             {(incomeSources ?? []).map((s) => (
@@ -298,7 +298,7 @@ export function TransactionForm({
           required
           aria-invalid={fieldErrors?.description ? true : undefined}
           aria-describedby={fieldErrors?.description ? fieldId("description-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.description && (
           <p id={fieldId("description-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -318,12 +318,16 @@ export function TransactionForm({
           onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
           rows={2}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
       {generalError && (
-        <p role="alert" aria-live="polite" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          aria-live="polite"
+          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
           {generalError}
         </p>
       )}

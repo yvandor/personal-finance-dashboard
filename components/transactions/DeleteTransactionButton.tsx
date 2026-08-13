@@ -66,7 +66,7 @@ export function DeleteTransactionButton({
           type="button"
           onClick={openDialog}
           aria-label={`Delete ${description}`}
-          className="rounded-md p-2.5 text-muted hover:bg-danger/10 hover:text-danger"
+          className="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path
@@ -80,7 +80,7 @@ export function DeleteTransactionButton({
         <button
           type="button"
           onClick={openDialog}
-          className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10"
+          className="rounded-lg border border-border-strong px-2.5 py-1 text-xs font-medium text-danger outline-none transition-colors hover:bg-danger/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Delete
         </button>

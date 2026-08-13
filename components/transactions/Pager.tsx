@@ -40,7 +40,7 @@ export function Pager({ itemsCount, total, hasNext, hasPrev, nextCursor, prevCur
         {hasPrev && prevCursor ? (
           <Link
             href={buildHref(searchParams, prevCursor, "prev")}
-            className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-hover"
+            className="rounded-lg border border-border-strong px-3 py-1.5 outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Previous
           </Link>
@@ -52,7 +52,7 @@ export function Pager({ itemsCount, total, hasNext, hasPrev, nextCursor, prevCur
         {hasNext && nextCursor ? (
           <Link
             href={buildHref(searchParams, nextCursor, "next")}
-            className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-hover"
+            className="rounded-lg border border-border-strong px-3 py-1.5 outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Next
           </Link>

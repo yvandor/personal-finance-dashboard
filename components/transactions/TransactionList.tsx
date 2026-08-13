@@ -25,7 +25,12 @@ export function TransactionList({
   onOptimisticUpdate,
   onOptimisticRemove,
 }: TransactionListProps) {
-  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  // "Uncategorized" is app-generated, not user data, so a literal fallback
+  // name is fine -- but its dot still needs a theme-aware color rather than
+  // a hardcoded hex, hence var(--muted) instead of a literal gray.
+  const FALLBACK_CATEGORY_NAME = "Uncategorized";
+  const FALLBACK_CATEGORY_COLOR = "var(--muted)";
 
   if (transactions.length === 0) {
     return (
@@ -68,34 +73,42 @@ export function TransactionList({
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t) => (
-            <TransactionTableRow
+          {transactions.map((t) => {
+            const category = categoryById.get(t.categoryId ?? "");
+            return (
+              <TransactionTableRow
+                key={t.id}
+                transaction={t}
+                categoryName={category?.name ?? FALLBACK_CATEGORY_NAME}
+                categoryColor={category?.color ?? FALLBACK_CATEGORY_COLOR}
+                categories={categories}
+                currency={currency}
+                onOptimisticAdd={onOptimisticAdd}
+                onOptimisticUpdate={onOptimisticUpdate}
+                onOptimisticRemove={onOptimisticRemove}
+              />
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div className="space-y-3 md:hidden">
+        {transactions.map((t) => {
+          const category = categoryById.get(t.categoryId ?? "");
+          return (
+            <TransactionCard
               key={t.id}
               transaction={t}
-              categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
+              categoryName={category?.name ?? FALLBACK_CATEGORY_NAME}
+              categoryColor={category?.color ?? FALLBACK_CATEGORY_COLOR}
               categories={categories}
               currency={currency}
               onOptimisticAdd={onOptimisticAdd}
               onOptimisticUpdate={onOptimisticUpdate}
               onOptimisticRemove={onOptimisticRemove}
             />
-          ))}
-        </tbody>
-      </table>
-
-      <div className="md:hidden">
-        {transactions.map((t) => (
-          <TransactionCard
-            key={t.id}
-            transaction={t}
-            categoryName={categoryNameById.get(t.categoryId ?? "") ?? "Uncategorized"}
-            categories={categories}
-            currency={currency}
-            onOptimisticAdd={onOptimisticAdd}
-            onOptimisticUpdate={onOptimisticUpdate}
-            onOptimisticRemove={onOptimisticRemove}
-          />
-        ))}
+          );
+        })}
       </div>
     </>
   );

@@ -43,7 +43,10 @@ export default async function HistoryPage({
         <MonthsBackSelector monthsBack={monthsBack ?? DEFAULT_MONTHS_BACK} />
       </div>
 
-      <div className="rounded-xl border border-border bg-surface">
+      {/* Boxed-card chrome is desktop-only -- see HistoryTable.tsx's comment
+          on why the mobile card list provides its own per-item elevation
+          instead. */}
+      <div className="md:rounded-xl md:border md:border-border md:bg-surface">
         <HistoryTable history={history} currency={currency} />
       </div>
     </div>

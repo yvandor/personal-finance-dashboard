@@ -54,7 +54,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
           value={q}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Search descriptions…"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
@@ -66,7 +66,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
           id="type"
           value={searchParams.get("type") ?? ""}
           onChange={(e) => updateParam("type", e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         >
           <option value="">All</option>
           <option value="INCOME">Income</option>
@@ -82,7 +82,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
           id="categoryId"
           value={searchParams.get("categoryId") ?? ""}
           onChange={(e) => updateParam("categoryId", e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         >
           <option value="">All categories</option>
           {categories.map((c) => (
@@ -102,7 +102,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
           type="date"
           value={searchParams.get("dateFrom") ?? ""}
           onChange={(e) => updateParam("dateFrom", e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
@@ -115,7 +115,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
           type="date"
           value={searchParams.get("dateTo") ?? ""}
           onChange={(e) => updateParam("dateTo", e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
@@ -123,7 +123,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
         <button
           type="button"
           onClick={() => router.push(pathname)}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-accent hover:underline"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-accent outline-none transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Clear filters
         </button>

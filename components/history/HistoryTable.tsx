@@ -23,6 +23,13 @@ function budgetsHrefForMonth(month: string): string {
   return `/budgets?month=${month}`;
 }
 
+// Shared by every drill-down link in both the desktop table and mobile card
+// list -- adds a visible keyboard-focus ring (Phase A's primitives all have
+// one; these plain <Link>s otherwise rely on the browser default) without
+// changing the underlying href/text any test asserts on.
+const LINK_CLASSES =
+  "rounded-sm outline-none transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 interface HistoryTableProps {
   history: MonthlyHistoryDTO[];
   currency?: string;
@@ -74,15 +81,15 @@ export function HistoryTable({ history, currency }: HistoryTableProps) {
         </thead>
         <tbody>
           {history.map((row) => (
-            <tr key={row.month} className="border-b border-border last:border-0">
+            <tr key={row.month} className="border-b border-border transition-colors last:border-0 hover:bg-surface-hover">
               <td className="px-4 py-3 font-medium">{formatMonthLabel(row.month)}</td>
               <td className="px-4 py-3 text-right">
-                <Link href={transactionsHrefForMonth(row.month)} className="hover:underline">
+                <Link href={transactionsHrefForMonth(row.month)} className={LINK_CLASSES}>
                   <Money cents={row.incomeCents} currency={currency} />
                 </Link>
               </td>
               <td className="px-4 py-3 text-right">
-                <Link href={transactionsHrefForMonth(row.month)} className="hover:underline">
+                <Link href={transactionsHrefForMonth(row.month)} className={LINK_CLASSES}>
                   <Money cents={-row.expenseCents} currency={currency} />
                 </Link>
               </td>
@@ -90,12 +97,12 @@ export function HistoryTable({ history, currency }: HistoryTableProps) {
                 <Money cents={row.netCents} currency={currency} />
               </td>
               <td className="px-4 py-3 text-right tabular-nums">
-                <Link href={budgetsHrefForMonth(row.month)} className="hover:underline">
+                <Link href={budgetsHrefForMonth(row.month)} className={LINK_CLASSES}>
                   {formatCents(row.totalBudgetedCents, currency)}
                 </Link>
               </td>
               <td className="px-4 py-3 text-right tabular-nums">
-                <Link href={budgetsHrefForMonth(row.month)} className="hover:underline">
+                <Link href={budgetsHrefForMonth(row.month)} className={LINK_CLASSES}>
                   {formatCents(row.totalSpentCents, currency)}
                 </Link>
               </td>
@@ -107,15 +114,20 @@ export function HistoryTable({ history, currency }: HistoryTableProps) {
         </tbody>
       </table>
 
-      <div className="md:hidden">
+      {/* Each month gets its own rounded-xl card on mobile -- same
+          reasoning as TransactionCard.tsx: the boxed-card chrome around
+          this whole table is desktop-only (see app/(dashboard)/history/
+          page.tsx), so per-item cards are what gives the mobile list its
+          elevation instead. */}
+      <div className="space-y-3 md:hidden">
         {history.map((row) => (
-          <div key={row.month} className="border-b border-border p-4 last:border-0">
+          <div key={row.month} className="rounded-xl border border-border bg-surface p-4">
             <p className="font-medium">{formatMonthLabel(row.month)}</p>
             <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
               <div>
                 <dt className="text-xs text-muted">Income</dt>
                 <dd>
-                  <Link href={transactionsHrefForMonth(row.month)} className="hover:underline">
+                  <Link href={transactionsHrefForMonth(row.month)} className={LINK_CLASSES}>
                     <Money cents={row.incomeCents} currency={currency} />
                   </Link>
                 </dd>
@@ -123,7 +135,7 @@ export function HistoryTable({ history, currency }: HistoryTableProps) {
               <div>
                 <dt className="text-xs text-muted">Expenses</dt>
                 <dd>
-                  <Link href={transactionsHrefForMonth(row.month)} className="hover:underline">
+                  <Link href={transactionsHrefForMonth(row.month)} className={LINK_CLASSES}>
                     <Money cents={-row.expenseCents} currency={currency} />
                   </Link>
                 </dd>
@@ -143,7 +155,7 @@ export function HistoryTable({ history, currency }: HistoryTableProps) {
               <div className="col-span-2">
                 <dt className="text-xs text-muted">Budget</dt>
                 <dd className="tabular-nums">
-                  <Link href={budgetsHrefForMonth(row.month)} className="hover:underline">
+                  <Link href={budgetsHrefForMonth(row.month)} className={LINK_CLASSES}>
                     {formatCents(row.totalSpentCents, currency)} of {formatCents(row.totalBudgetedCents, currency)}
                   </Link>
                 </dd>

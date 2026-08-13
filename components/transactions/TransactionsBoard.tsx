@@ -100,7 +100,11 @@ export function TransactionsBoard({
 
       <TransactionFilters categories={categories} />
 
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      {/* Boxed-card chrome is desktop-only: the mobile card list below
+          renders each transaction as its own rounded-xl card (see
+          TransactionCard.tsx), so wrapping the whole list in a second
+          border here would double up on mobile. */}
+      <div className="md:overflow-hidden md:rounded-xl md:border md:border-border md:bg-surface">
         <TransactionList
           transactions={optimisticTransactions}
           categories={categories}
@@ -110,7 +114,9 @@ export function TransactionsBoard({
           onOptimisticUpdate={(id, patch) => dispatch({ type: "update", id, patch })}
           onOptimisticRemove={removeTransaction}
         />
-        <Pager {...pager} itemsCount={optimisticTransactions.length} />
+        <div className="mt-3 md:mt-0">
+          <Pager {...pager} itemsCount={optimisticTransactions.length} />
+        </div>
       </div>
     </>
   );
