@@ -124,8 +124,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           swallow clicks on whatever sits along the bottom of the page. The
           bottom offset folds the safe-area inset into the same declaration as
           the normal 1rem gap -- see the note in app/globals.css on why a bare
-          .pb-safe utility would replace that 1rem rather than add to it. */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--safe-area-bottom)+1rem)] z-50 flex flex-col items-center gap-2 px-4">
+          .pb-safe utility would replace that 1rem rather than add to it.
+
+          Below md, components/layout/BottomNav.tsx occupies the bottom of the
+          viewport (a fixed h-16 = 4rem bar plus its own 0.5rem bottom
+          padding, i.e. 4.5rem of non-safe-area height) -- the mobile offset
+          clears that bar plus the usual 1rem gap (4.5rem + 1rem = 5.5rem).
+          BottomNav is md:hidden, so md: reverts to the original offset. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--safe-area-bottom)+5.5rem)] z-50 flex flex-col items-center gap-2 px-4 md:bottom-[calc(var(--safe-area-bottom)+1rem)]">
         {toasts.map((t) => (
           <Toast
             key={t.id}
