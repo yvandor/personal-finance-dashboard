@@ -14,14 +14,14 @@ export function Toast({ message, actionLabel, onAction }: ToastProps) {
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center gap-4 rounded-lg border border-border bg-surface px-4 py-3 shadow-lg"
+      className="pointer-events-auto flex w-full max-w-sm items-center gap-4 rounded-xl border border-border bg-surface px-4 py-3 shadow-overlay"
     >
-      <p className="text-sm">{message}</p>
+      <p className="min-w-0 flex-1 text-sm">{message}</p>
       {actionLabel && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="shrink-0 text-sm font-semibold text-accent hover:underline"
+          className="shrink-0 rounded-md px-1 text-sm font-semibold text-accent outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {actionLabel}
         </button>

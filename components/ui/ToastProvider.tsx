@@ -119,7 +119,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, showNotice }}>
       {children}
-      <div className="fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4">
+      {/* pointer-events-none on the full-width stack, re-enabled per Toast:
+          the container spans the viewport even when empty, and would otherwise
+          swallow clicks on whatever sits along the bottom of the page. The
+          bottom offset folds the safe-area inset into the same declaration as
+          the normal 1rem gap -- see the note in app/globals.css on why a bare
+          .pb-safe utility would replace that 1rem rather than add to it. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--safe-area-bottom)+1rem)] z-50 flex flex-col items-center gap-2 px-4">
         {toasts.map((t) => (
           <Toast
             key={t.id}

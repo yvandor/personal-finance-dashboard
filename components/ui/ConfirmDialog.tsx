@@ -42,11 +42,14 @@ export function ConfirmDialog({
     <Modal open={open} onClose={onCancel} title={title}>
       <p className="text-sm text-muted">{description}</p>
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
           {error}
         </p>
       )}
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-6 flex justify-end gap-2">
         <Button ref={cancelRef} type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

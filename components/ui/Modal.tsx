@@ -110,17 +110,17 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       // changes. On mobile, w-full already resolves to 100% of the
       // available space, so there's no extra space for the auto margins to
       // distribute -- this only changes desktop/tablet centering.
-      className="m-auto w-full max-w-lg rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/50"
+      className="m-auto w-full max-w-lg rounded-xl border border-border bg-surface p-0 text-foreground shadow-overlay backdrop:bg-slate-950/60 backdrop:backdrop-blur-[2px]"
     >
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 id={titleId} className="text-base font-semibold">
+      <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+        <h2 id={titleId} className="text-lg font-semibold">
           {title}
         </h2>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="rounded-md p-2 text-muted hover:bg-surface-hover hover:text-foreground"
+          className="-mr-1 shrink-0 rounded-md p-2 text-muted transition-colors outline-none hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
