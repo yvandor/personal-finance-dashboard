@@ -26,7 +26,7 @@ export function TrendChart({ data, currency }: TrendChartProps) {
 
   return (
     <section aria-labelledby="trend-chart-heading" className="rounded-xl border border-border bg-surface p-4">
-      <h2 id="trend-chart-heading" className="text-sm font-semibold">
+      <h2 id="trend-chart-heading" className="text-sm font-medium">
         Income vs. expenses by month
       </h2>
 
