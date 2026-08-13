@@ -149,7 +149,7 @@ export function BudgetForm({
             required
             aria-invalid={fieldErrors?.categoryId ? true : undefined}
             aria-describedby={fieldErrors?.categoryId ? fieldId("category-error") : undefined}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+            className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
           >
             <option value="" disabled>
               Select a category
@@ -186,7 +186,7 @@ export function BudgetForm({
           required
           aria-invalid={fieldErrors?.amount ? true : undefined}
           aria-describedby={fieldErrors?.amount ? fieldId("amount-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.amount && (
           <p id={fieldId("amount-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -206,7 +206,7 @@ export function BudgetForm({
           onChange={(e) => setNotes(e.target.value)}
           maxLength={500}
           rows={2}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 

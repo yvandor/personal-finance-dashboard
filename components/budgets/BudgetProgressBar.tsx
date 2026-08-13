@@ -35,10 +35,10 @@ export function BudgetProgressBar({ percentUsed, isOverBudget }: BudgetProgressB
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuetext={`${percentUsed}% used, ${label}`}
-        className="h-2 w-full overflow-hidden rounded-full bg-surface-hover"
+        className="h-2 w-full overflow-hidden rounded-full bg-surface-hover ring-1 ring-inset ring-border"
       >
         <div
-          className={`h-full rounded-full transition-all ${barColorClass(percentUsed, isOverBudget)}`}
+          className={`h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none ${barColorClass(percentUsed, isOverBudget)}`}
           style={{ width: `${displayPercent}%` }}
         />
       </div>

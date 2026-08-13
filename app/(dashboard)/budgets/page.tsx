@@ -36,9 +36,23 @@ export default async function BudgetsPage({
   const budgetedCategoryIds = new Set(budgets.map((b) => b.categoryId));
   const availableCategories = filterAvailableBudgetCategories(categories, budgetedCategoryIds);
 
+  // Presentation-only lookup so each BudgetCard's header can render the
+  // real CategoryBadge dot color -- `categories` (already fetched above for
+  // the create dropdown) is the same active-category list, just re-shaped
+  // here by id. No extra query: this reuses data the page already reads.
+  // A budget whose category has since been archived (excluded from
+  // listCategories()) simply falls back to a neutral dot in BudgetCard.
+  const categoryColors = Object.fromEntries(categories.map((c) => [c.id, c.color]));
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      <BudgetsBoard budgets={budgets} availableCategories={availableCategories} month={month} currency={currency} />
+      <BudgetsBoard
+        budgets={budgets}
+        availableCategories={availableCategories}
+        categoryColors={categoryColors}
+        month={month}
+        currency={currency}
+      />
     </div>
   );
 }

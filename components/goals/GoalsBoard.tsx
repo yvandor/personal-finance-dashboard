@@ -12,8 +12,13 @@ interface GoalsBoardProps {
   currency?: string;
 }
 
+// Mirrors components/ui/Button.tsx's primary variant exactly (shared base
+// classes, focus-visible ring, disabled treatment) -- this trigger renders
+// as a plain <button> via GoalFormDialog's own trigger rather than <Button>
+// itself, so the classes are duplicated here rather than imported. Same
+// pattern as components/budgets/BudgetsBoard.tsx's PRIMARY_BUTTON_CLASSES.
 const PRIMARY_BUTTON_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 bg-accent text-accent-foreground hover:opacity-90";
 
 // Owns the useOptimistic overlay so the header's "Add goal" trigger and the
 // grid below it share one optimistic array -- same shape as
@@ -25,7 +30,7 @@ export function GoalsBoard({ goals, contributionsByGoal, currency }: GoalsBoardP
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Savings Goals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Savings Goals</h1>
           <p className="text-sm text-muted">
             Track progress toward a target. Contributions are independent of your transaction ledger.
           </p>
