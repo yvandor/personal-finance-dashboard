@@ -70,7 +70,7 @@ export function BillRow({ bill, categories, periodMonth, currency, onOptimisticU
             bill={bill}
             periodMonth={periodMonth}
             currency={currency}
-            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            triggerClassName="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Mark ${bill.name} paid`}
           >
             Mark paid
@@ -81,7 +81,7 @@ export function BillRow({ bill, categories, periodMonth, currency, onOptimisticU
             mode="edit"
             bill={bill}
             categories={categories}
-            triggerClassName="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            triggerClassName="inline-flex size-11 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Edit ${bill.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

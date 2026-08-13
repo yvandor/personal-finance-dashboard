@@ -46,7 +46,7 @@ export function TransactionCard({
           mode="edit"
           transaction={transaction}
           categories={categories}
-          triggerClassName="rounded-lg border border-border-strong px-2.5 py-1 text-xs font-medium outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          triggerClassName="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-strong px-4 text-sm font-medium outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onOptimisticUpdate={onOptimisticUpdate}
         >
           Edit

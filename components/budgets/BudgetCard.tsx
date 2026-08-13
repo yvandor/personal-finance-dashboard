@@ -9,8 +9,15 @@ import type { BudgetProgressDTO } from "@/server/data/budgets";
 // DeleteBudgetButton) -- same rounded-md chip + focus-visible ring as
 // components/ui/Modal.tsx's close button, the frozen primitive this pattern
 // is modeled on.
+//
+// size-11 (44x44) rather than Modal's padding-derived box: this trigger is a
+// thumb target in a mobile card list, and 44px is the minimum comfortable
+// one. The 16px icon is centred in it, so the chip reads the same, just with
+// a larger hit area. Modal's own close button keeps its smaller box -- it is
+// a frozen primitive, and every icon trigger in a row/card list moves
+// together with this constant.
 export const ICON_BUTTON_CLASSES =
-  "rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-flex size-11 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 interface BudgetCardProps {
   budget: BudgetProgressDTO;

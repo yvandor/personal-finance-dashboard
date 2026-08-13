@@ -36,15 +36,30 @@ export function BottomNav({ signOutSlot }: BottomNavProps) {
     <>
       <nav
         aria-label="Primary"
-        // Fixed, deliberate 64px (h-16) content height -- reported to the
-        // integrating lead so ToastProvider's mobile bottom offset can
-        // clear it. pb-[calc(...)] combines the home-indicator safe-area
-        // inset with the bar's normal 0.5rem bottom padding in one
-        // declaration, same reasoning as the mobile header's
-        // pt-[calc(...)] in app/(dashboard)/layout.tsx -- see
-        // app/globals.css's comment on why a bare .pb-safe utility can't
-        // just be stacked on top of a separate padding declaration.
-        className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-stretch border-t border-border bg-surface pb-[calc(var(--safe-area-bottom)+0.5rem)] md:hidden"
+        // Fixed, deliberate 4rem (64px) *content* height for the tab row --
+        // reported to the integrating lead so ToastProvider's mobile bottom
+        // offset and app/(dashboard)/layout.tsx's <main> bottom padding can
+        // both clear this bar.
+        //
+        // The height has to be a calc rather than a plain h-16: Tailwind's
+        // preflight sets `box-sizing: border-box` on everything, so h-16
+        // would make 4rem the bar's TOTAL height and the pb-[calc(...)]
+        // below would eat into the tab row from inside it rather than add
+        // to it. With a nonzero home-indicator inset (34px on a notched
+        // iPhone in standalone mode, which is exactly where this bar
+        // matters) that left the tabs ~21px tall -- far under the 44px
+        // minimum touch target, and 0.5rem shorter than that even with a
+        // zero inset. Spelling out content + inset + padding keeps the tab
+        // row a real 4rem on every device and makes the bar's total height
+        // exactly the 4.5rem + inset both consumers above assume.
+        //
+        // pb-[calc(...)] combines the home-indicator safe-area inset with
+        // the bar's normal 0.5rem bottom padding in one declaration, same
+        // reasoning as the mobile header's pt-[calc(...)] in
+        // app/(dashboard)/layout.tsx -- see app/globals.css's comment on why
+        // a bare .pb-safe utility can't just be stacked on top of a separate
+        // padding declaration.
+        className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(4rem+0.5rem+var(--safe-area-bottom))] items-stretch border-t border-border bg-surface pb-[calc(var(--safe-area-bottom)+0.5rem)] md:hidden"
       >
         {primaryItems.map((item) => (
           <BottomNavLink key={item.href} item={item} />

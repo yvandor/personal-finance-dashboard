@@ -45,7 +45,7 @@ export function TransactionTableRow({
             mode="edit"
             transaction={transaction}
             categories={categories}
-            triggerClassName="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            triggerClassName="inline-flex size-11 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Edit ${transaction.description}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

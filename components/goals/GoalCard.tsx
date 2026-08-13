@@ -13,9 +13,10 @@ import type { SavingsGoalProgressDTO, ContributionDTO } from "@/server/data/savi
 // DeleteGoalButton) -- same rounded-md chip + focus-visible ring as
 // components/ui/Modal.tsx's close button, the frozen primitive this pattern
 // is modeled on. Same shape as components/budgets/BudgetCard.tsx's
-// ICON_BUTTON_CLASSES.
+// ICON_BUTTON_CLASSES -- including its size-11 (44x44) thumb target; see
+// that file for why the box is sized rather than padded.
 const ICON_BUTTON_CLASSES =
-  "rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-flex size-11 items-center justify-center rounded-md text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 interface GoalCardProps {
   goal: SavingsGoalProgressDTO;
@@ -95,7 +96,7 @@ export function GoalCard({
           <ContributionFormDialog
             goalId={goal.id}
             goal={goal}
-            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            triggerClassName="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Add contribution to ${goal.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >
