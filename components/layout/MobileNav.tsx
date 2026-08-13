@@ -67,16 +67,21 @@ export function MobileNav({ signOutSlot, open: openProp, onOpenChange, hideTrigg
   }, [open]);
 
   // Closing on every route change (not just an explicit link click) also
-  // covers browser back/forward navigation while the drawer is open. Adjusts
-  // state during render rather than in an effect -- React's documented
-  // pattern for "resetting state when a prop changes" without the extra
-  // render-then-effect round trip a useEffect([pathname]) would cause (see
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
-  const [prevPathname, setPrevPathname] = useState(pathname);
-  if (pathname !== prevPathname) {
-    setPrevPathname(pathname);
-    setOpen(false);
-  }
+  // covers browser back/forward navigation while the drawer is open. This
+  // has to run in an effect, not during render: when controlled (see
+  // BottomNav.tsx), setOpen resolves to the PARENT's setState, and React
+  // disallows calling a different component's setState while THIS
+  // component renders ("Cannot update a component while rendering a
+  // different component"). A plain ref (not state) tracks the previous
+  // pathname since it exists only to detect the change for this effect --
+  // it never needs to trigger a render itself.
+  const previousPathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (previousPathnameRef.current !== pathname) {
+      previousPathnameRef.current = pathname;
+      setOpen(false);
+    }
+  }, [pathname, setOpen]);
 
   return (
     <>
