@@ -39,10 +39,15 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("heading", { name: "Income vs. expenses by month" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Expenses by category" })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible(); // TrendChart's month/income/expenses table
-    // exact: true -- RecentTransactions' "This month's groceries" description
-    // and its "Groceries · <date>" category label both also contain
-    // "Groceries" as a substring.
-    await expect(page.getByText("Groceries", { exact: true })).toBeVisible(); // CategoryBreakdownChart's legend list
+    // Scoped to the category chart's own region -- CategoryBadge (see
+    // components/ui/CategoryBadge.tsx) now renders the category name as its
+    // own exact-text node in both CategoryBreakdownChart's legend AND
+    // RecentTransactions' rows, so an unscoped exact-text locator would be
+    // ambiguous between the two. The <section aria-labelledby> in
+    // CategoryBreakdownChart.tsx gives it an accessible "region" name to
+    // scope against.
+    const categoryChart = page.getByRole("region", { name: "Expenses by category" });
+    await expect(categoryChart.getByText("Groceries", { exact: true })).toBeVisible(); // CategoryBreakdownChart's legend list
 
     // Change the reporting period -- the older, two-months-ago paycheck
     // should now be included, changing the income total.
