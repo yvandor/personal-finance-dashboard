@@ -17,7 +17,7 @@ interface IncomeSourcesBoardProps {
 }
 
 const PRIMARY_BUTTON_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 // Owns the useOptimistic overlay so the header's "Add income source"
 // trigger and the management list below it share one optimistic array --
@@ -36,7 +36,7 @@ export function IncomeSourcesBoard({ incomeSources, incomeVsExpected, month, cur
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Income Sources</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Income Sources</h1>
           <p className="text-sm text-muted">
             Track expected recurring income and compare it against what actually came in each month.
           </p>

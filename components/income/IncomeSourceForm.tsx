@@ -92,7 +92,7 @@ export function IncomeSourceForm({ mode, incomeSource, onSuccess, onOptimisticAd
           required
           aria-invalid={fieldErrors?.name ? true : undefined}
           aria-describedby={fieldErrors?.name ? fieldId("name-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.name && (
           <p id={fieldId("name-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -116,7 +116,7 @@ export function IncomeSourceForm({ mode, incomeSource, onSuccess, onOptimisticAd
           required
           aria-invalid={fieldErrors?.amount ? true : undefined}
           aria-describedby={fieldErrors?.amount ? fieldId("amount-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.amount && (
           <p id={fieldId("amount-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -141,7 +141,7 @@ export function IncomeSourceForm({ mode, incomeSource, onSuccess, onOptimisticAd
           required
           aria-invalid={fieldErrors?.payDay ? true : undefined}
           aria-describedby={fieldErrors?.payDay ? fieldId("payDay-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         <p className="mt-1 text-sm text-muted">
           Day of the month this is expected. A value of 31 means the last day of any shorter month.
@@ -164,12 +164,16 @@ export function IncomeSourceForm({ mode, incomeSource, onSuccess, onOptimisticAd
           onChange={(e) => setNotes(e.target.value)}
           maxLength={500}
           rows={2}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
       {generalError && (
-        <p role="alert" aria-live="polite" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          aria-live="polite"
+          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
           {generalError}
         </p>
       )}

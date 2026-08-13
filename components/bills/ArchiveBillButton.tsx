@@ -72,7 +72,7 @@ export function ArchiveBillButton({ id, name, isActive, onOptimisticUpdate }: Ar
           setOpen(true);
         }}
         aria-label={`Archive ${name}`}
-        className="rounded-md p-2.5 text-muted hover:bg-danger/10 hover:text-danger"
+        className="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M3 4h18v4H3V4Zm2 4h14v12H5V8Zm4 4h6" strokeLinecap="round" strokeLinejoin="round" />

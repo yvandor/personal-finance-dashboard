@@ -17,7 +17,7 @@ interface BillsBoardProps {
 }
 
 const PRIMARY_BUTTON_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 // Owns the useOptimistic overlay so the header's "Add bill" trigger and the
 // list below it share one optimistic array -- same shape as
@@ -29,7 +29,7 @@ export function BillsBoard({ bills, categories, periodMonth, currency }: BillsBo
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Bills</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Bills</h1>
           <p className="text-sm text-muted">
             Track recurring bills and mark them paid each month. This is a reminder only -- nothing is charged automatically.
           </p>

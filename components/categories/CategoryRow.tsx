@@ -1,5 +1,6 @@
 import { CategoryFormDialog } from "./CategoryFormDialog";
 import { ArchiveCategoryButton } from "./ArchiveCategoryButton";
+import { CategoryBadge } from "@/components/ui/CategoryBadge";
 import type { CategoryManagementDTO } from "@/server/data/categories";
 
 interface CategoryRowProps {
@@ -10,30 +11,23 @@ interface CategoryRowProps {
 export function CategoryRow({ category, onOptimisticUpdate }: CategoryRowProps) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="h-4 w-4 shrink-0 rounded-full border border-border"
-          style={{ backgroundColor: category.color }}
-        />
-        <div className="min-w-0">
-          <p className="truncate font-medium">
-            {category.name}
-            {category.isSystem && <span className="ml-2 text-xs font-normal text-muted">Default</span>}
-          </p>
-          <p className="text-sm text-muted">
-            {category.transactionCount === 0
-              ? "Not currently in use"
-              : `${category.transactionCount} transaction${category.transactionCount === 1 ? "" : "s"}`}
-          </p>
-        </div>
+      <div className="min-w-0">
+        <p className="font-medium">
+          <CategoryBadge name={category.name} color={category.color} />
+          {category.isSystem && <span className="ml-2 text-xs font-normal text-muted">Default</span>}
+        </p>
+        <p className="text-sm text-muted">
+          {category.transactionCount === 0
+            ? "Not currently in use"
+            : `${category.transactionCount} transaction${category.transactionCount === 1 ? "" : "s"}`}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {!category.isArchived && (
           <CategoryFormDialog
             mode="edit"
             category={category}
-            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Edit ${category.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

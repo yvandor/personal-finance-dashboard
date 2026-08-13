@@ -1,4 +1,5 @@
 import { Money } from "@/components/ui/Money";
+import { CategoryBadge } from "@/components/ui/CategoryBadge";
 import { BillFormDialog } from "./BillFormDialog";
 import { MarkBillPaidDialog } from "./MarkBillPaidDialog";
 import { ArchiveBillButton } from "./ArchiveBillButton";
@@ -36,12 +37,27 @@ function formatDueDate(dueDate: string): string {
 }
 
 export function BillRow({ bill, categories, periodMonth, currency, onOptimisticUpdate }: BillRowProps) {
+  // categories is the active-only EXPENSE list passed down from
+  // app/(dashboard)/bills/page.tsx -- if a bill's category has since been
+  // archived it won't be in this list, so CategoryBadge (which needs the
+  // color) falls back to the bill's own denormalized categoryName as plain
+  // text rather than rendering nothing.
+  const billCategory = bill.categoryId ? categories.find((c) => c.id === bill.categoryId) : undefined;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
         <p className="truncate font-medium">
           {bill.name}
-          {bill.categoryName && <span className="ml-2 text-xs font-normal text-muted">{bill.categoryName}</span>}
+          {billCategory ? (
+            <CategoryBadge
+              name={billCategory.name}
+              color={billCategory.color}
+              className="ml-2 text-xs font-normal text-muted"
+            />
+          ) : (
+            bill.categoryName && <span className="ml-2 text-xs font-normal text-muted">{bill.categoryName}</span>
+          )}
         </p>
         <p className="text-sm text-muted">
           <Money cents={-bill.amountCents} currency={currency} className="text-foreground" /> · Due{" "}
@@ -54,7 +70,7 @@ export function BillRow({ bill, categories, periodMonth, currency, onOptimisticU
             bill={bill}
             periodMonth={periodMonth}
             currency={currency}
-            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
+            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Mark ${bill.name} paid`}
           >
             Mark paid
@@ -65,7 +81,7 @@ export function BillRow({ bill, categories, periodMonth, currency, onOptimisticU
             mode="edit"
             bill={bill}
             categories={categories}
-            triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
+            triggerClassName="rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Edit ${bill.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >

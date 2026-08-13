@@ -79,13 +79,17 @@ export function MarkBillPaidForm({ bill, periodMonth, currency, onSuccess }: Mar
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+            className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
           />
         </div>
       )}
 
       {generalError && (
-        <p role="alert" aria-live="polite" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          aria-live="polite"
+          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
           {generalError}
         </p>
       )}

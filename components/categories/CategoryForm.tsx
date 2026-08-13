@@ -98,7 +98,7 @@ export function CategoryForm({ mode, category, onSuccess, onOptimisticAdd, onOpt
           required
           aria-invalid={fieldErrors?.name ? true : undefined}
           aria-describedby={fieldErrors?.name ? fieldId("name-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         {fieldErrors?.name && (
           <p id={fieldId("name-error")} role="alert" className="mt-1 text-sm text-danger">
@@ -149,7 +149,7 @@ export function CategoryForm({ mode, category, onSuccess, onOptimisticAdd, onOpt
             type="color"
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            className="h-9 w-14 rounded-md border border-border bg-background p-1"
+            className="h-9 w-14 rounded-md border border-border-strong bg-background p-1"
           />
           <span className="text-sm text-muted">{color}</span>
         </div>
@@ -161,7 +161,11 @@ export function CategoryForm({ mode, category, onSuccess, onOptimisticAdd, onOpt
       </div>
 
       {generalError && (
-        <p role="alert" aria-live="polite" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          aria-live="polite"
+          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
           {generalError}
         </p>
       )}
