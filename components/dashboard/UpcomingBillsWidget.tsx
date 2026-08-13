@@ -71,7 +71,7 @@ export function UpcomingBillsWidget({ bills, currency }: UpcomingBillsWidgetProp
   return (
     <section className="rounded-xl border border-border bg-surface p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Upcoming bills</h2>
+        <h2 className="text-sm font-medium">Upcoming bills</h2>
         <Link href="/bills" className="text-sm font-medium text-accent hover:underline">
           View bills
         </Link>

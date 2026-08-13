@@ -31,7 +31,7 @@ export function BudgetStatusSummary({ status, currency }: BudgetStatusSummaryPro
         <Money cents={status.totalSpentCents} currency={currency} className="font-medium" /> of{" "}
         <Money cents={status.totalBudgetedCents} currency={currency} className="font-medium" /> budgeted this month
         {status.overBudgetCount > 0 && (
-          <span className="ml-1 font-medium text-expense">
+          <span className="ml-1 font-medium text-danger">
             · {status.overBudgetCount} {status.overBudgetCount === 1 ? "category" : "categories"} over budget
           </span>
         )}

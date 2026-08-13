@@ -2,6 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCents } from "@/lib/money";
+import { CategoryBadge } from "@/components/ui/CategoryBadge";
 import type { CategoryBreakdownItemDTO } from "@/server/data/dashboard";
 
 const SLICE_COLORS = [
@@ -27,7 +28,7 @@ export function CategoryBreakdownChart({ data, currency }: CategoryBreakdownChar
 
   return (
     <section aria-labelledby="category-chart-heading" className="rounded-xl border border-border bg-surface p-4">
-      <h2 id="category-chart-heading" className="text-sm font-semibold">
+      <h2 id="category-chart-heading" className="text-sm font-medium">
         Expenses by category
       </h2>
 
@@ -54,18 +55,24 @@ export function CategoryBreakdownChart({ data, currency }: CategoryBreakdownChar
             </ResponsiveContainer>
           </div>
 
-          <ul className="mt-4 space-y-1.5 text-sm">
+          {/* Text fallback for the pie above -- load-bearing for accessibility
+              (chart meaning must never be color-only, and this is also what
+              component tests assert against, see the comment at the top of
+              this file). Each row's dot color comes from the same
+              SLICE_COLORS[index] mapping as the Pie's Cell -- category
+              breakdown rows have no per-category `color` field of their own
+              (unlike RecentTransactions/CategoryList, which use the real
+              user-picked category color), so this stays in sync with the
+              chart rather than introducing a second, unrelated color source. */}
+          <ul className="mt-4 space-y-1.5 text-sm text-muted">
             {data.map((item, index) => (
               <li key={item.categoryName} className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-muted">
-                  <span
-                    aria-hidden="true"
-                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: SLICE_COLORS[index % SLICE_COLORS.length] }}
-                  />
-                  {item.categoryName}
-                </span>
-                <span className="tabular-nums">
+                <CategoryBadge
+                  name={item.categoryName}
+                  color={SLICE_COLORS[index % SLICE_COLORS.length]}
+                  className="min-w-0 flex-1"
+                />
+                <span className="shrink-0 tabular-nums">
                   {formatCents(item.totalCents, currency)}
                   {total > 0 && (
                     <span className="ml-1 text-muted">({Math.round((item.totalCents / total) * 100)}%)</span>

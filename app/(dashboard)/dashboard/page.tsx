@@ -55,7 +55,7 @@ export default async function DashboardPage({
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted">Your income, spending, and savings at a glance.</p>
         </div>
         <PeriodSelector period={period} />
