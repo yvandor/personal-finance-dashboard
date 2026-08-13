@@ -147,7 +147,7 @@ export function ContributionForm({ goalId, onSuccess, goal, onOptimisticUpdate }
           required
           aria-invalid={fieldErrors?.amount ? true : undefined}
           aria-describedby={fieldErrors?.amount ? fieldId("amount-error") : undefined}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
         <div className="mt-2 flex flex-wrap gap-2">
           {QUICK_AMOUNTS.map((v) => (
@@ -155,7 +155,7 @@ export function ContributionForm({ goalId, onSuccess, goal, onOptimisticUpdate }
               key={v}
               type="button"
               onClick={() => setAmount(v)}
-              className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-surface-hover"
+              className="rounded-full border border-border-strong px-3 py-1 text-xs font-medium outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               ${v}
             </button>
@@ -179,7 +179,7 @@ export function ContributionForm({ goalId, onSuccess, goal, onOptimisticUpdate }
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 
@@ -194,7 +194,7 @@ export function ContributionForm({ goalId, onSuccess, goal, onOptimisticUpdate }
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={200}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border-strong bg-background px-3 py-2 text-base focus:border-accent focus:outline-none"
         />
       </div>
 

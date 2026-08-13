@@ -29,7 +29,7 @@ export function MonthSelector({ month }: { month: string }) {
         type="button"
         onClick={() => go(shiftMonthKey(month, -1))}
         aria-label="Previous month"
-        className="rounded-lg border border-border p-2 hover:bg-surface-hover"
+        className="rounded-md border border-border-strong p-2 outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -40,7 +40,7 @@ export function MonthSelector({ month }: { month: string }) {
         type="button"
         onClick={() => go(shiftMonthKey(month, 1))}
         aria-label="Next month"
-        className="rounded-lg border border-border p-2 hover:bg-surface-hover"
+        className="rounded-md border border-border-strong p-2 outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />

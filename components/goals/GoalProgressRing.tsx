@@ -48,10 +48,10 @@ export function GoalProgressRing({ percentComplete, isAchieved, size = 96 }: Goa
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className={isAchieved ? "text-income transition-all" : "text-accent transition-all"}
+          className={`transition-[stroke-dashoffset] duration-500 ease-out motion-reduce:transition-none ${isAchieved ? "text-income" : "text-accent"}`}
         />
       </svg>
-      <span className="absolute text-sm font-semibold">{isAchieved ? "🎉" : `${displayPercent}%`}</span>
+      <span className="absolute text-sm font-semibold tabular-nums">{isAchieved ? "🎉" : `${displayPercent}%`}</span>
     </div>
   );
 }

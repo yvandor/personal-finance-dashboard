@@ -9,6 +9,14 @@ import { DeleteGoalButton } from "./DeleteGoalButton";
 import { ContributionHistoryList } from "./ContributionHistoryList";
 import type { SavingsGoalProgressDTO, ContributionDTO } from "@/server/data/savingsGoals";
 
+// Shared by every icon-only trigger on this card (edit here, delete inside
+// DeleteGoalButton) -- same rounded-md chip + focus-visible ring as
+// components/ui/Modal.tsx's close button, the frozen primitive this pattern
+// is modeled on. Same shape as components/budgets/BudgetCard.tsx's
+// ICON_BUTTON_CLASSES.
+const ICON_BUTTON_CLASSES =
+  "rounded-md p-2.5 text-muted outline-none transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 interface GoalCardProps {
   goal: SavingsGoalProgressDTO;
   contributions: ContributionDTO[];
@@ -61,10 +69,10 @@ export function GoalCard({
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-medium">{goal.name}</p>
+          <p className="truncate text-sm font-medium">{goal.name}</p>
           {goal.description && <p className="mt-0.5 text-sm text-muted">{goal.description}</p>}
           {goal.targetDate && (
             <p className="mt-0.5 text-sm text-muted">Target: {formatTargetDate(goal.targetDate)}</p>
@@ -87,7 +95,7 @@ export function GoalCard({
           <ContributionFormDialog
             goalId={goal.id}
             goal={goal}
-            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
+            triggerClassName="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground outline-none transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             triggerAriaLabel={`Add contribution to ${goal.name}`}
             onOptimisticUpdate={onOptimisticUpdate}
           >
@@ -97,7 +105,7 @@ export function GoalCard({
         <GoalFormDialog
           mode="edit"
           goal={goal}
-          triggerClassName="rounded-md p-2.5 text-muted hover:bg-surface-hover hover:text-accent"
+          triggerClassName={ICON_BUTTON_CLASSES}
           triggerAriaLabel={`Edit ${goal.name}`}
           onOptimisticUpdate={onOptimisticUpdate}
         >
@@ -114,7 +122,7 @@ export function GoalCard({
           type="button"
           onClick={() => setHistoryOpen((v) => !v)}
           aria-expanded={historyOpen}
-          className="ml-auto text-sm text-muted underline-offset-2 hover:text-foreground hover:underline"
+          className="ml-auto rounded-md text-sm text-muted outline-none underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {historyOpen ? "Hide history" : `History (${contributions.length})`}
         </button>

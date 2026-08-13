@@ -62,7 +62,7 @@ export function GoalGrid({
             type="button"
             onClick={() => setCompletedOpen((v) => !v)}
             aria-expanded={completedOpen}
-            className="mb-2 text-sm font-semibold text-muted hover:text-foreground"
+            className="mb-2 rounded-md text-sm font-semibold text-muted outline-none transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Completed ({completed.length}) {completedOpen ? "▾" : "▸"}
           </button>

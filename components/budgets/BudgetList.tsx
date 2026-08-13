@@ -4,12 +4,21 @@ import type { BudgetProgressDTO } from "@/server/data/budgets";
 interface BudgetListProps {
   budgets: BudgetProgressDTO[];
   currency?: string;
+  /** categoryId -> #rrggbb, threaded down to each BudgetCard's CategoryBadge. */
+  categoryColors?: Record<string, string>;
   onOptimisticAdd?: (budget: BudgetProgressDTO) => void;
   onOptimisticUpdate?: (id: string, patch: Partial<BudgetProgressDTO>) => void;
   onOptimisticRemove?: (id: string) => void;
 }
 
-export function BudgetList({ budgets, currency, onOptimisticAdd, onOptimisticUpdate, onOptimisticRemove }: BudgetListProps) {
+export function BudgetList({
+  budgets,
+  currency,
+  categoryColors,
+  onOptimisticAdd,
+  onOptimisticUpdate,
+  onOptimisticRemove,
+}: BudgetListProps) {
   if (budgets.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-4 py-16 text-center">
@@ -26,6 +35,7 @@ export function BudgetList({ budgets, currency, onOptimisticAdd, onOptimisticUpd
           key={budget.id}
           budget={budget}
           currency={currency}
+          categoryColor={categoryColors?.[budget.categoryId]}
           onOptimisticAdd={onOptimisticAdd}
           onOptimisticUpdate={onOptimisticUpdate}
           onOptimisticRemove={onOptimisticRemove}
