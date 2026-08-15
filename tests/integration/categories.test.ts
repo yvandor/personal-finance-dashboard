@@ -9,7 +9,9 @@ import {
   unarchiveCategory,
   listCategories,
   listCategoriesForManagement,
+  seedDefaultCategories,
 } from "@/server/data/categories";
+import { DEFAULT_CATEGORIES } from "@/lib/defaultCategories";
 import {
   updateCategoryAction,
   archiveCategoryAction,
@@ -88,6 +90,77 @@ describe("categories DAL", () => {
       await expect(
         createCategory({ name: "Groceries", type: "EXPENSE", userId: "someone-else" }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("seedDefaultCategories", () => {
+    it("gives a brand-new user the full default set", async () => {
+      await seedDefaultCategories(DEV_USER_ID);
+      const rows = await prisma.category.findMany({ where: { userId: DEV_USER_ID } });
+      expect(rows).toHaveLength(DEFAULT_CATEGORIES.length);
+      const names = rows.map((r) => r.name).sort();
+      expect(names).toEqual([...DEFAULT_CATEGORIES.map((c) => c.name)].sort());
+      expect(rows.every((r) => r.isSystem)).toBe(true);
+    });
+
+    it("is only created once -- calling it again does not duplicate", async () => {
+      await seedDefaultCategories(DEV_USER_ID);
+      await seedDefaultCategories(DEV_USER_ID);
+      const count = await prisma.category.count({ where: { userId: DEV_USER_ID } });
+      expect(count).toBe(DEFAULT_CATEGORIES.length);
+    });
+
+    it("gives two users separate category records, not shared/global ones", async () => {
+      await seedDefaultCategories(DEV_USER_ID);
+      await seedDefaultCategories(OTHER_USER_ID);
+
+      const mine = await prisma.category.findMany({ where: { userId: DEV_USER_ID } });
+      const theirs = await prisma.category.findMany({ where: { userId: OTHER_USER_ID } });
+      expect(mine).toHaveLength(DEFAULT_CATEGORIES.length);
+      expect(theirs).toHaveLength(DEFAULT_CATEGORIES.length);
+      // Disjoint row ids -- each user has their own rows, not a shared one.
+      const mineIds = new Set(mine.map((r) => r.id));
+      expect(theirs.every((r) => !mineIds.has(r.id))).toBe(true);
+    });
+
+    it("does not duplicate categories under concurrent calls (simulating repeated sign-ins racing)", async () => {
+      await Promise.all([
+        seedDefaultCategories(DEV_USER_ID),
+        seedDefaultCategories(DEV_USER_ID),
+        seedDefaultCategories(DEV_USER_ID),
+      ]);
+      const count = await prisma.category.count({ where: { userId: DEV_USER_ID } });
+      expect(count).toBe(DEFAULT_CATEGORIES.length);
+    });
+
+    it("preserves an existing custom category that collides with a default name, while still adding the other defaults", async () => {
+      const custom = await createCategory({ name: "Housing", type: "EXPENSE", color: "#123456" });
+
+      await seedDefaultCategories(DEV_USER_ID);
+
+      // Exactly one "Housing"/EXPENSE row -- the user's own, untouched.
+      const housing = await prisma.category.findMany({
+        where: { userId: DEV_USER_ID, type: "EXPENSE", name: "Housing" },
+      });
+      expect(housing).toHaveLength(1);
+      expect(housing[0]?.id).toBe(custom.id);
+      expect(housing[0]?.color).toBe("#123456");
+      expect(housing[0]?.isSystem).toBe(false);
+
+      // Every other default was still added around it.
+      const total = await prisma.category.count({ where: { userId: DEV_USER_ID } });
+      expect(total).toBe(DEFAULT_CATEGORIES.length);
+    });
+
+    it("splits into the correct EXPENSE/INCOME counts for picker filtering", async () => {
+      await seedDefaultCategories(DEV_USER_ID);
+      const rows = await listCategories();
+
+      const expenseCount = DEFAULT_CATEGORIES.filter((c) => c.type === "EXPENSE").length;
+      const incomeCount = DEFAULT_CATEGORIES.filter((c) => c.type === "INCOME").length;
+
+      expect(rows.filter((c) => c.type === "EXPENSE")).toHaveLength(expenseCount);
+      expect(rows.filter((c) => c.type === "INCOME")).toHaveLength(incomeCount);
     });
   });
 

@@ -1,10 +1,13 @@
-// Creates the fixed dev-user (see server/context.ts) and a starter set of
-// categories, so a fresh clone has something to select in the transaction
-// form. Idempotent — safe to run more than once. Not run automatically by
-// tests (tests/setup.ts manages its own fixtures against a separate
-// database); this is for the dev database only.
+// Creates the fixed dev-user (see server/context.ts) and the same starter
+// categories a real new user gets (lib/defaultCategories.ts -- shared with
+// server/data/categories.ts's seedDefaultCategories, so local dev never
+// looks different from what real onboarding produces). Idempotent — safe
+// to run more than once. Not run automatically by tests (tests/setup.ts
+// manages its own fixtures against a separate database); this is for the
+// dev database only.
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../app/generated/prisma/client";
+import { DEFAULT_CATEGORIES } from "../lib/defaultCategories";
 
 function requireDevUserId(): string {
   const id = process.env.DEV_USER_ID;
@@ -19,21 +22,6 @@ const DEV_USER_ID = requireDevUserId();
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const DEFAULT_CATEGORIES: Array<{ name: string; type: "INCOME" | "EXPENSE" }> = [
-  { name: "Salary", type: "INCOME" },
-  { name: "Freelance", type: "INCOME" },
-  { name: "Other Income", type: "INCOME" },
-  { name: "Housing", type: "EXPENSE" },
-  { name: "Groceries", type: "EXPENSE" },
-  { name: "Transport", type: "EXPENSE" },
-  { name: "Utilities", type: "EXPENSE" },
-  { name: "Dining Out", type: "EXPENSE" },
-  { name: "Health", type: "EXPENSE" },
-  { name: "Entertainment", type: "EXPENSE" },
-  { name: "Shopping", type: "EXPENSE" },
-  { name: "Other", type: "EXPENSE" },
-];
-
 async function main() {
   await prisma.user.upsert({
     where: { id: DEV_USER_ID },
@@ -42,7 +30,7 @@ async function main() {
   });
   console.log(`Ensured dev user "${DEV_USER_ID}" exists.`);
 
-  for (const [index, category] of DEFAULT_CATEGORIES.entries()) {
+  for (const category of DEFAULT_CATEGORIES) {
     await prisma.category.upsert({
       where: {
         userId_type_name: { userId: DEV_USER_ID, type: category.type, name: category.name },
@@ -52,7 +40,7 @@ async function main() {
         type: category.type,
         name: category.name,
         isSystem: true,
-        sortOrder: index,
+        sortOrder: category.sortOrder,
       },
       update: {},
     });

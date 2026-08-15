@@ -4,6 +4,7 @@ import { requireUserId } from "@/server/context";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { authzDenied } from "@/server/logger";
 import { categoryCreateSchema, categoryUpdateSchema } from "@/lib/schemas/category";
+import { DEFAULT_CATEGORIES } from "@/lib/defaultCategories";
 import type { Category } from "@/app/generated/prisma/client";
 import type { CategoryType } from "@/app/generated/prisma/enums";
 import { Prisma } from "@/app/generated/prisma/client";
@@ -67,6 +68,36 @@ function toValidationError(err: unknown): never {
     throw new ValidationError("A category with this name already exists.");
   }
   throw err;
+}
+
+// Seeds the standard starter categories (lib/defaultCategories.ts) for a
+// single user. Takes an explicit userId rather than requireUserId() because
+// its two real callers -- server/auth.ts's events.createUser (fired by
+// Auth.js during the OAuth callback, no request-scoped session yet for the
+// user being created) and scripts/backfill-default-categories.ts (a
+// standalone process) -- never have an active session to resolve.
+//
+// Idempotent and concurrency-safe by construction, not by a manual
+// check-then-insert: createMany + skipDuplicates compiles to a single
+// INSERT ... ON CONFLICT DO NOTHING, which the categories table's existing
+// `@@unique([userId, type, name])` constraint (prisma/schema.prisma) makes
+// safe under real concurrent calls for the same user -- two overlapping
+// invocations race at the database, not in application code, and neither
+// errors nor duplicates. It's also safe to call for a user who already has
+// some categories: any name/type that already exists (including a custom
+// category that happens to share a default's name) is silently skipped,
+// never overwritten -- this only ever fills in what's missing.
+export async function seedDefaultCategories(userId: string): Promise<void> {
+  await prisma.category.createMany({
+    data: DEFAULT_CATEGORIES.map((c) => ({
+      userId,
+      name: c.name,
+      type: c.type,
+      isSystem: true,
+      sortOrder: c.sortOrder,
+    })),
+    skipDuplicates: true,
+  });
 }
 
 export async function createCategory(input: unknown): Promise<CategoryDTO> {

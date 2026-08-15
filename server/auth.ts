@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/server/db";
 import { serverEnv } from "@/server/env";
 import { logAuthSigninSuccess } from "@/server/logger";
+import { handleUserCreated } from "@/server/authEvents";
 
 // The single Auth.js config for this app -- used directly by proxy.ts as
 // well as everywhere else (Server Components, Server Actions, the route
@@ -70,5 +71,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = user.id;
       return session;
     },
+  },
+  events: {
+    // Fires exactly once per account, right after @auth/prisma-adapter
+    // creates a brand-new User row -- never on a returning user's later
+    // sign-ins, which just re-link the existing Account/User instead. That
+    // makes it the precise "brand-new user" hook (see
+    // seedDefaultCategories's own comment for why it's idempotent
+    // regardless). Awaited so the new user's categories exist by the time
+    // Auth.js redirects them into the app -- the transaction/budget forms
+    // that load right after sign-in need something selectable immediately.
+    createUser: handleUserCreated,
   },
 });
