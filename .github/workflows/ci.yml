@@ -41,7 +41,6 @@ jobs:
       AUTH_SECRET: "ci-build-only-secret-never-used-for-anything-real"
       AUTH_GITHUB_ID: "ci-build-only-github-id-never-used-for-anything-real"
       AUTH_GITHUB_SECRET: "ci-build-only-github-secret-never-used-for-anything-real"
-      ALLOWED_SIGNIN_EMAILS: "ci-unused@example.invalid"
 
     steps:
       - uses: actions/checkout@v4

@@ -4,8 +4,7 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/server/db";
 import { serverEnv } from "@/server/env";
-import { isAllowedSigninEmail } from "@/lib/auth";
-import { hashEmail, logAuthSigninBlocked, logAuthSigninSuccess } from "@/server/logger";
+import { logAuthSigninSuccess } from "@/server/logger";
 
 // The single Auth.js config for this app -- used directly by proxy.ts as
 // well as everywhere else (Server Components, Server Actions, the route
@@ -21,11 +20,13 @@ import { hashEmail, logAuthSigninBlocked, logAuthSigninSuccess } from "@/server/
 // and the DB is already in the request path via requireUserId() on every
 // request regardless.
 //
-// This app has no self-serve sign-up (see lib/auth.ts's isAllowedSigninEmail
-// comment) -- the signIn callback below is the enforcement point, checked
-// on every sign-in attempt, not just the first one, so removing an email
-// from the allowlist takes effect immediately rather than only blocking
-// new account creation.
+// Public beta (v1.7): any account that completes GitHub OAuth may sign in --
+// there is no email allowlist anymore. Authentication itself (GitHub OAuth
+// + database sessions) is unchanged, and per-user data isolation is
+// enforced entirely elsewhere: every DAL call is scoped through
+// requireUserId() (server/context.ts), which reads the authenticated
+// session's own user id -- never a client-supplied one -- so it does not
+// depend on who was allowed to sign in.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "database" },
@@ -45,25 +46,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/sign-in",
   },
   callbacks: {
-    // The allowlist decision is logged either way, because both outcomes
-    // are security-relevant and each is only interpretable against the
-    // other: a blocked attempt matters most when it is NOT surrounded by
-    // the owner's own successful sign-ins. Neither line carries the email
-    // itself -- see server/logger.ts on why blocked attempts log a
-    // truncated digest and successful ones log the opaque user id instead.
+    // No allowlist check: any account that completes the OAuth flow above
+    // may sign in. Still logged -- a successful sign-in is security-relevant
+    // on its own, not just as the counterpart to a blocked one -- see
+    // server/logger.ts on why it logs the opaque user id rather than the
+    // email.
     async signIn({ user, account }) {
       // `account` is non-null for the OAuth flow this app actually uses;
       // next-auth types it nullable to cover Credentials/Email providers,
       // which are deliberately not configured here.
       const provider = account?.provider ?? "unknown";
-
-      if (!isAllowedSigninEmail(user.email, serverEnv.ALLOWED_SIGNIN_EMAILS)) {
-        // A missing email is itself a rejection (isAllowedSigninEmail fails
-        // closed on it), so there is nothing to hash -- the sentinel keeps
-        // the field's shape uniform without inventing a digest.
-        logAuthSigninBlocked({ emailHash: user.email ? hashEmail(user.email) : "no-email", provider });
-        return false;
-      }
 
       logAuthSigninSuccess({ userId: user.id ?? "pending-adapter-create", provider });
       return true;

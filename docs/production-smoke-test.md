@@ -17,9 +17,9 @@ exactly the ones a passing test suite can still miss.
 ## Before you start
 
 - [ ] **You have a dedicated smoke-test account.** Not your personal account
-      and not a real user's. Auth is GitHub OAuth with an email allowlist
-      (`server/auth.ts` + `ALLOWED_SIGNIN_EMAILS`), so the smoke account's
-      GitHub email must be on that allowlist in the production environment.
+      and not a real user's. Auth is GitHub OAuth (`server/auth.ts`); any
+      GitHub account can sign in, so use a throwaway one rather than an
+      account tied to a real person.
 - [ ] **You know the production URL** and are certain it is production, not a
       preview/staging deployment. Check the URL in the address bar before
       every destructive step.

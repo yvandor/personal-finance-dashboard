@@ -13,7 +13,6 @@ const ALL_REQUIRED = {
   AUTH_SECRET: "test-secret",
   AUTH_GITHUB_ID: "test-github-id",
   AUTH_GITHUB_SECRET: "test-github-secret",
-  ALLOWED_SIGNIN_EMAILS: "owner@example.com",
 };
 
 function stubAll(vars: Partial<Record<keyof typeof ALL_REQUIRED, string>>) {
@@ -29,7 +28,7 @@ describe("assertProductionAuthConfigured", () => {
 
   it("does not throw outside production, regardless of auth configuration", () => {
     vi.stubEnv("NODE_ENV", "development");
-    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "", ALLOWED_SIGNIN_EMAILS: "" });
+    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "" });
     expect(() => assertProductionAuthConfigured()).not.toThrow();
   });
 
@@ -57,24 +56,10 @@ describe("assertProductionAuthConfigured", () => {
     expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_GITHUB_SECRET/);
   });
 
-  it("throws in production when ALLOWED_SIGNIN_EMAILS is missing", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    stubAll({ ALLOWED_SIGNIN_EMAILS: "" });
-    expect(() => assertProductionAuthConfigured()).toThrow(/ALLOWED_SIGNIN_EMAILS/);
-  });
-
-  it("throws in production when ALLOWED_SIGNIN_EMAILS is whitespace-only", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    stubAll({ ALLOWED_SIGNIN_EMAILS: "   " });
-    expect(() => assertProductionAuthConfigured()).toThrow(/ALLOWED_SIGNIN_EMAILS/);
-  });
-
   it("lists every missing variable in one error, not just the first", () => {
     vi.stubEnv("NODE_ENV", "production");
-    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "", ALLOWED_SIGNIN_EMAILS: "" });
-    expect(() => assertProductionAuthConfigured()).toThrow(
-      /AUTH_SECRET.*AUTH_GITHUB_ID.*AUTH_GITHUB_SECRET.*ALLOWED_SIGNIN_EMAILS/,
-    );
+    stubAll({ AUTH_SECRET: "", AUTH_GITHUB_ID: "", AUTH_GITHUB_SECRET: "" });
+    expect(() => assertProductionAuthConfigured()).toThrow(/AUTH_SECRET.*AUTH_GITHUB_ID.*AUTH_GITHUB_SECRET/);
   });
 
   it("has no PREAUTH_MODE_ACKNOWLEDGED override -- fully-set-but-real-looking config still passes on its own merits", () => {

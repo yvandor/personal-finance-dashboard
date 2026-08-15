@@ -65,11 +65,13 @@ export function hashEmail(email: string): string {
 }
 
 /**
- * A sign-in attempt from an address that is not on ALLOWED_SIGNIN_EMAILS.
- * Warn, not error: a rejected sign-in is the allowlist working, not a fault
- * -- but it is the one event worth alerting on if it ever comes in bursts,
- * since this app has no self-serve sign-up and therefore no legitimate
- * reason for a stranger to be attempting one.
+ * A rejected sign-in attempt. Not currently called from server/auth.ts --
+ * there is no email allowlist as of v1.7, so every completed OAuth sign-in
+ * succeeds -- but kept as reusable, independently-tested logging
+ * infrastructure for any future rejection path (e.g. a banned account).
+ * Warn, not error: a rejected sign-in is a gate working as intended, not a
+ * fault, but it's the one event worth alerting on if it ever comes in
+ * bursts.
  */
 export function logAuthSigninBlocked(fields: { emailHash: string; provider: string }): void {
   emit("warn", { event: "auth.signin.blocked", ...fields });

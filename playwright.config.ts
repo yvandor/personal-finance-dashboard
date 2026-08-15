@@ -105,8 +105,8 @@ export default defineConfig({
       // whatever Host header any request claims.
       //
       // server/env.ts's assertProductionAuthConfigured() now hard-requires
-      // AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS too (there's
-      // no PREAUTH_MODE_ACKNOWLEDGED override anymore) -- throwaway values,
+      // AUTH_GITHUB_ID/AUTH_GITHUB_SECRET too (there's no
+      // PREAUTH_MODE_ACKNOWLEDGED override anymore) -- throwaway values,
       // same spirit as AUTH_SECRET above. Every production-mode spec
       // authenticates via a real seeded database session (fixtures.ts's
       // seedE2ESession()), never real GitHub OAuth, so these values are
@@ -117,7 +117,6 @@ export default defineConfig({
             AUTH_URL: baseURL,
             AUTH_GITHUB_ID: "e2e-test-only-github-id-never-used-for-anything-real",
             AUTH_GITHUB_SECRET: "e2e-test-only-github-secret-never-used-for-anything-real",
-            ALLOWED_SIGNIN_EMAILS: "e2e-unused@example.invalid",
           }
         : {}),
     },

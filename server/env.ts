@@ -9,7 +9,7 @@ import { z } from "zod";
 // the only two modules that ever read anything from here; every other
 // server module reaches these values only through those two, the same "one
 // seam" pattern requireUserId() itself already uses.
-// AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/ALLOWED_SIGNIN_EMAILS stay
+// AUTH_SECRET/AUTH_GITHUB_ID/AUTH_GITHUB_SECRET stay
 // .optional() in this schema -- they're genuinely optional outside
 // production, where ALLOW_DEV_AUTH_BYPASS (server/context.ts) lets local
 // dev and the test suite run without real GitHub OAuth App credentials
@@ -39,13 +39,6 @@ const serverEnvSchema = z.object({
   AUTH_SECRET: z.string().min(1).optional(),
   AUTH_GITHUB_ID: z.string().min(1).optional(),
   AUTH_GITHUB_SECRET: z.string().min(1).optional(),
-  // Comma-separated email allowlist -- this app has no self-serve sign-up
-  // story (see docs/PROJECT_PLAN.md §8 and README's Roadmap): only accounts
-  // whose email appears here may complete sign-in, checked in
-  // server/auth.ts's signIn callback. Parsed into a Set by lib/auth.ts's
-  // isAllowedSigninEmail(), not here, so the parsing logic is independently
-  // unit-testable.
-  ALLOWED_SIGNIN_EMAILS: z.string().optional(),
 });
 
 // docs/PROJECT_PLAN.md §8: "this app must never serve real traffic without
@@ -54,9 +47,8 @@ const serverEnvSchema = z.object({
 // could still fall back to one fixed DEV_USER_ID in production via a
 // PREAUTH_MODE_ACKNOWLEDGED escape hatch -- that escape hatch has been
 // REMOVED (not tightened) now that real Auth.js v5 authentication
-// (server/auth.ts, lib/auth.ts) is verified end-to-end: production must
-// have real GitHub OAuth + sign-in-allowlist configuration, full stop, with
-// no override.
+// (server/auth.ts) is verified end-to-end: production must have real
+// GitHub OAuth configuration, full stop, with no override.
 //
 // Checked at BUILD time too, not just runtime: `next build` statically
 // prerenders several routes by actually executing their Server Component
@@ -73,15 +65,15 @@ const serverEnvSchema = z.object({
 export function assertProductionAuthConfigured(): void {
   if (process.env.NODE_ENV !== "production") return;
 
-  const required = ["AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET", "ALLOWED_SIGNIN_EMAILS"] as const;
+  const required = ["AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET"] as const;
   const missing = required.filter((name) => !process.env[name]?.trim());
 
   if (missing.length > 0) {
     throw new Error(
       `Refusing to build or start in production: missing required auth configuration (${missing.join(", ")}). ` +
-        "Real authentication (Auth.js v5 GitHub OAuth + a sign-in allowlist -- see server/auth.ts, " +
-        "lib/auth.ts) must be fully configured before this app can serve real traffic or real " +
-        "financial data (docs/PROJECT_PLAN.md §8). There is no pre-auth escape hatch anymore.",
+        "Real authentication (Auth.js v5 GitHub OAuth -- see server/auth.ts) must be fully configured " +
+        "before this app can serve real traffic or real financial data (docs/PROJECT_PLAN.md §8). " +
+        "There is no pre-auth escape hatch anymore.",
     );
   }
 }
@@ -93,7 +85,6 @@ function loadServerEnv() {
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID,
     AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET,
-    ALLOWED_SIGNIN_EMAILS: process.env.ALLOWED_SIGNIN_EMAILS,
   });
   if (!parsed.success) {
     const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
